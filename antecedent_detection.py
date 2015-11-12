@@ -445,10 +445,12 @@ class AntecedentClassifier:
                         vp_words.append(w)
                         self.antecedents.add_ant(sentnum, tree[position], trigger, copy.copy(vp_words))
 
-                """  This is too complicated...
+                # This is too complicated...
+                """
                 for subtree in NT.get_linear_phrase_combinations(tree, 'VP'):
                     self.antecedents.add_ant(sentnum, subtree, trigger, subtree.leaves())
                 """
+
                 for position in NT.phrase_positions_in_tree(tree, 'predicative'):
                     self.antecedents.add_ant(sentnum, tree[position], trigger, tree[position].leaves())
 

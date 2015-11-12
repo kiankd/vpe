@@ -5,7 +5,6 @@ import numpy as np
 from truth import *
 import math
 
-
 # @author Kian Kenyon-Dean
 # Purpose: to generate feature vectors according to an alignment of comparing the environment of a possible antecedent to
 # the surrounding environment of the trigger.

@@ -3,6 +3,8 @@ import nltktree as nt
 import word_characteristics as wc
 from file_names import Files
 from os import listdir
+from truth import SENTENCE_SEARCH_DISTANCE
+from heapq import nlargest
 
 MODALS = ['can','could','may','must','might','will','would','shall','should']
 BE     = ['be']
@@ -27,6 +29,8 @@ class NoSubsequenceFoundException:
     def __init__(self): pass
 class Finished:
     def __init__(self): pass
+class WrongClassEquivalenceException:
+    def __init__(self): pass
 
 """ ---- Data imporation classes. ---- """
 class AllSentences:
@@ -47,6 +51,23 @@ class AllSentences:
 
     def get_sentence(self, i):
         return self.sentences[i]
+
+    def set_possible_ants(self, trigger):
+        for sentnum in range(max(0, trigger.sentnum - SENTENCE_SEARCH_DISTANCE), trigger.sentnum+1):
+            #Every possible linear combination of words.
+            # for i in range(len(self.sentences[sentnum])):
+            #     for j in range(i+1, len(self.sentences[sentnum])):
+            #         trigger.add_possible_ant(self.idxs_to_ant(sentnum, i, j, trigger))
+            for i in range(len(self.sentences[sentnum])):
+                tag = self.sentences[sentnum].pos[i]
+                if wc.is_verb(tag) or wc.is_predicative(tag) or wc.is_adjective(tag):
+                    for j in range(i+1, len(self.sentences[sentnum])):
+                        trigger.add_possible_ant(self.idxs_to_ant(sentnum, i, j, trigger))
+
+
+    def idxs_to_ant(self, sentnum, start, end, trigger):
+        sentdict = self.sentences[sentnum]
+        return Antecedent(start, trigger, SubSentDict(sentdict.words[start:end], sentdict.pos[start:end], sentdict.lemmas[start:end]))
 
 class XMLMatrix:
     """ A matrix of SentDicts built by getting passed a Stanford CoreNLP XML file. """
@@ -175,8 +196,7 @@ class XMLMatrix:
         ann_num = 0
         crt_annotation = annotations[ann_num]
         raw_matrix = []
-        raw_gold_ants = Antecedents()
-
+        raw_gold_ants = []
         try:
             for sentence in root.iter('sentence'):
                 try:
@@ -188,26 +208,20 @@ class XMLMatrix:
                         # print s.offset_starts[i],crt_annotation.ant_offset_start
                         if got or s.offset_starts[i] in range(crt_annotation.ant_offset_start-1,crt_annotation.ant_offset_start+2): #TODO: I MADE THIS LESS STRICT
                             ant_words.append(s.words[i])
-
                             if not got:
                                 ant_start = i
                                 got = True
-
                             if s.offset_ends[i] in range(crt_annotation.ant_offset_end-1, crt_annotation.ant_offset_end+2):
                                 ann_num += 1
-                                raw_gold_ants.add_ant(RawAntecedent(ant_words, ant_start, i, s.sentnum))
-
+                                raw_gold_ants.append(RawAntecedent(ant_words, ant_start, i, s.sentnum))
                                 try:
                                     crt_annotation = annotations[ann_num]
                                 except IndexError:
                                     raise Finished()
-
                                 ant_words = []
                                 got = False
                         i+=1
-
                     raw_matrix.append(s)
-
                 except EmptySentDictException:
                     continue
         except Finished:
@@ -220,13 +234,12 @@ class XMLMatrix:
             assert False
             # raise Exception('Error! When extracting the annotations using the raw data, we didn\'t get the correct number of antecedents!')
 
-
         """ Now that we got the antecedents according to their location/offsets within the raw text files (above),
             we now have to link the RawAntecedents with their corresponding MRG/POS XML file Antecedents. """
 
         # print 'Len triggers: %d. Len Ants: %d.'%(len(triggers),len(raw_gold_ants))
 
-        mrg_gold_ants = Antecedents()
+        mrg_gold_ants = []
         assert len(triggers) == len(raw_gold_ants)
         for i in range(len(raw_gold_ants)):
             raw_ant = raw_gold_ants[i]
@@ -234,11 +247,11 @@ class XMLMatrix:
             while True:
                 try:
                     start_idx,end_idx = self.find_word_sequence(raw_ant.words, minimum_match=k)
-                    mrg_gold_ants.add_ant(self.idxs_to_ant(start_idx, end_idx, triggers[i], sentnum_modifier)) # TODO: make a function tot turn idxs to antecedent.
+                    mrg_gold_ants.append(self.idxs_to_ant(start_idx, end_idx, triggers[i], sentnum_modifier))
+                    triggers[i].set_antecedent(mrg_gold_ants[-1]) # Set the trigger to match the gold antecedent.
                     break
                 except NoSubsequenceFoundException:
                     k -= 1
-
         return mrg_gold_ants
 
     def idxs_to_ant(self, start, end, trigger, sentnum_modifier):
@@ -251,6 +264,12 @@ class SubSentDict:
         self.words = words
         self.pos = pos
         self.lemmas = lemmas
+
+    def __eq__(self, other):
+        if type(self) is type(other):
+            return self.__dict__ == other.__dict__
+        else:
+            raise WrongClassEquivalenceException()
 
 class SentDict:
     """ Dictionary for any sentence from a Stanford CoreNLP XML file. Can be modified to have more attributes. """
@@ -421,6 +440,8 @@ class Auxiliary:
         self.sentnum = sentnum
         self.wordnum = wordnum
         self.is_trigger = False
+        self.gold_ant = None
+        self.possible_ants = []
 
     def __repr__(self):
         return 'Type: %s, Lemma: %s, Word: %s, POS: %s, Sentnum: %d, Wordnum: %s'\
@@ -431,6 +452,12 @@ class Auxiliary:
         return self.sentnum == aux.sentnum and self.wordnum == aux.wordnum
         # return self.wordnum == aux.wordnum and self.type == aux.type and self.word == aux.word and \
         #        self.lemma == aux.lemma and self.pos == aux.pos
+
+    def set_antecedent(self, ant):
+        self.gold_ant = ant
+
+    def add_possible_ant(self, ant):
+        self.possible_ants.append(ant)
 
     def get_type(self, lemma):
         if lemma in MODALS: return 'modal'
@@ -450,33 +477,6 @@ class RawAuxiliary:
         self.wordnum = wordnum
 
 """" ---- Antecedent classes. ---- """
-class Antecedents:
-    def __init__(self):
-        self.ants = []
-
-    def __iter__(self):
-        for ant in self.ants:
-            yield ant
-
-    def __len__(self):
-        return len(self.ants)
-
-    def __getitem__(self, i):
-        return self.ants[i]
-
-    def add_ant(self, ant):
-        self.ants.append(ant)
-
-    def add_ants(self, ants):
-        for ant in ants:
-            self.add_ant(ant)
-
-    def get_ant(self, i):
-        return self.ants[i]
-
-    def get_ants(self):
-        return self.ants
-
 class Antecedent:
     def __init__(self, sentnum, trigger, sub_sentdict, section=-1):
         self.sentnum = sentnum
@@ -485,7 +485,7 @@ class Antecedent:
         self.sub_sentdict = sub_sentdict
         self.section = section
         self.context = None
-        self.score = 0
+        self.x = None # features
 
     def __repr__(self):
         ret = ''

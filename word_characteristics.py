@@ -55,6 +55,9 @@ def is_preposition(tag):
 def is_adjective(tag):
     return tag in ['JJ','JJR','JJS']
 
+def is_predicative(tag):
+    return 'PRD' in tag
+
 def is_noun(tag):
     return tag in ['NN','NNS','NNP','NNPS','WP','PRP','PRP$','DT']
 

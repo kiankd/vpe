@@ -3,8 +3,8 @@ import nltktree as nt
 import numpy as np
 import word_characteristics as wc
 import time
-import old.detectVPE as DV
-import vpe_objects as VPE
+import old.detectVPE as dv
+import vpe_objects as vpe
 
 from file_names import Files
 from scipy.sparse import csr_matrix,vstack
@@ -40,11 +40,11 @@ class VPEDetectionClassifier:
     ADABOOST = 'Adaboost'
 
     def __init__(self, start_train, end_train, start_test, end_test):
-        self.sentences = VPE.AllSentences()
-        self.annotations = VPE.Annotations()
+        self.sentences = vpe.AllSentences()
+        self.annotations = vpe.Annotations()
         self.file_names = Files()
-        self.all_auxiliaries = VPE.Auxiliaries()
-        self.gold_standard_auxs = VPE.Auxiliaries()
+        self.all_auxiliaries = vpe.Auxiliaries()
+        self.gold_standard_auxs = vpe.Auxiliaries()
 
         self.hyperplane = None
         self.features = []
@@ -87,7 +87,7 @@ class VPEDetectionClassifier:
             subdir = d+self.file_names.SLASH_CHAR
             if subdir.startswith('.'): continue
             if (self.start_train <= dnum <= self.end_train) or (self.start_test <= dnum <= self.end_test):
-                section_annotation = VPE.AnnotationSection(subdir, self.file_names.VPE_ANNOTATIONS)
+                section_annotation = vpe.AnnotationSection(subdir, self.file_names.VPE_ANNOTATIONS)
 
                 vpe_files = list(set([annotation.file for annotation in section_annotation]))
                 vpe_files.sort()
@@ -96,7 +96,7 @@ class VPEDetectionClassifier:
                     if not test or (test and f in test):
                         # Here we are now getting the non-MRG POS file that we had neglected to get before.
                         try:
-                            mrg_matrix = VPE.XMLMatrix(f+'.mrg.xml', self.file_names.XML_MRG+subdir)
+                            mrg_matrix = vpe.XMLMatrix(f+'.mrg.xml', self.file_names.XML_MRG+subdir)
                         except IOError:
                             continue
                             # mrg_matrix = XMLMatrix(f+'.pos.xml', self.file_names.XML_POS, pos_file=True)
@@ -132,13 +132,13 @@ class VPEDetectionClassifier:
             sentdict = self.sentences.get_sentence(aux.sentnum)
 
             if self.start_train <= sentdict.get_section() <= self.end_train:
-                self.train_vectors.append(csr_matrix(vc.make_vector(sentdict, aux, self.features, VPE.ALL_CATEGORIES, VPE.AUX_LEMMAS, VPE.ALL_AUXILIARIES, frequent_words, all_pos, pos_bigrams, make_old=use_old_vectors)))
+                self.train_vectors.append(csr_matrix(vc.make_vector(sentdict, aux, self.features, vpe.ALL_CATEGORIES, vpe.AUX_LEMMAS, vpe.ALL_AUXILIARIES, frequent_words, all_pos, pos_bigrams, make_old=use_old_vectors)))
                 self.train_classes.append(vc.bool_to_int(aux.is_trigger))
                 if len(self.train_vectors) % 1000 == 0 or len(self.train_vectors) == 1:
                     print 'Making the %dth training vector...'%(len(self.train_vectors))
 
             if make_test_vectors and self.start_test <= sentdict.get_section() <= self.end_test:
-                self.test_vectors.append(csr_matrix(vc.make_vector(sentdict, aux, self.features, VPE.ALL_CATEGORIES, VPE.AUX_LEMMAS, VPE.ALL_AUXILIARIES, frequent_words, all_pos, pos_bigrams, make_old=use_old_vectors)))
+                self.test_vectors.append(csr_matrix(vc.make_vector(sentdict, aux, self.features, vpe.ALL_CATEGORIES, vpe.AUX_LEMMAS, vpe.ALL_AUXILIARIES, frequent_words, all_pos, pos_bigrams, make_old=use_old_vectors)))
                 self.test_classes.append(vc.bool_to_int(aux.is_trigger))
                 if len(self.test_vectors) % 1000 == 0 or len(self.test_vectors) == 1:
                     print 'Making the %dth testing vector...'%(len(self.test_vectors))
@@ -197,12 +197,12 @@ class VPEDetectionClassifier:
                 elif aux.type == 'to': self.predictions.append(vc.bool_to_int(wc.to_rule(sendict, aux)))
             else:
                 auxidx = aux.wordnum
-                if aux.type == 'modal': self.predictions.append(vc.bool_to_int(DV.modalcheck(sendict, auxidx, tree, word_subtree_positions)))
-                elif aux.type == 'be': self.predictions.append(vc.bool_to_int(DV.becheck(sendict, auxidx, tree, word_subtree_positions)))
-                elif aux.type == 'have': self.predictions.append(vc.bool_to_int(DV.havecheck(sendict, auxidx, tree, word_subtree_positions)))
-                elif aux.type == 'do': self.predictions.append(vc.bool_to_int(DV.docheck(sendict, auxidx, tree, word_subtree_positions)))
-                elif aux.type == 'so': self.predictions.append(vc.bool_to_int(DV.socheck(sendict, auxidx, tree, word_subtree_positions)))
-                elif aux.type == 'to': self.predictions.append(vc.bool_to_int(DV.tocheck(sendict, auxidx, tree, word_subtree_positions)))
+                if aux.type == 'modal': self.predictions.append(vc.bool_to_int(dv.modalcheck(sendict, auxidx, tree, word_subtree_positions)))
+                elif aux.type == 'be': self.predictions.append(vc.bool_to_int(dv.becheck(sendict, auxidx, tree, word_subtree_positions)))
+                elif aux.type == 'have': self.predictions.append(vc.bool_to_int(dv.havecheck(sendict, auxidx, tree, word_subtree_positions)))
+                elif aux.type == 'do': self.predictions.append(vc.bool_to_int(dv.docheck(sendict, auxidx, tree, word_subtree_positions)))
+                elif aux.type == 'so': self.predictions.append(vc.bool_to_int(dv.socheck(sendict, auxidx, tree, word_subtree_positions)))
+                elif aux.type == 'to': self.predictions.append(vc.bool_to_int(dv.tocheck(sendict, auxidx, tree, word_subtree_positions)))
 
     def results(self, name):
         if len(self.predictions) != len(self.test_classes):
