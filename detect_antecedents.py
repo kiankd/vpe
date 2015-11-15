@@ -158,6 +158,7 @@ if __name__ == '__main__':
     #     print a.sentences.get_sentence(trig.gold_ant.sentnum)
     # print '---------'
 
+    # Using functional programming here because it's nice
     a.generate_possible_ants(['VP','ADJ-PRD','NP-PRD', wc.is_adjective, wc.is_verb], sd=5)
     a.debug_ant_selection(verbose=False, write_to_file='antecedent_generation.txt')
 

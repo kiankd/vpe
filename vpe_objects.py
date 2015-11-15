@@ -215,6 +215,7 @@ class XMLMatrix:
         return gold_standard
 
     def get_gs_antecedents(self, annotations, triggers, sentnum_modifier):
+        """Finds the gold standard antecedents using the old raw xml files and annotations to link to mrg xmls."""
         parser = ET.XMLParser()
         tree = ET.parse(Files.XML_RAW_TOKENIZED+self.get_subdir()+Files.SLASH_CHAR+self.file_name[0:8]+'.xml', parser=parser)
         root = tree.getroot()
@@ -286,6 +287,7 @@ class XMLMatrix:
         return Antecedent(start[0]+sentnum_modifier+1, trigger, SubSentDict(sentdict.words[i:j], sentdict.pos[i:j], sentdict.lemmas[i:j]))
 
 class SubSentDict:
+    """Antecedents have this."""
     def __init__(self, words, pos, lemmas):
         self.words = words
         self.pos = pos
