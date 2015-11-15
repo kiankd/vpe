@@ -4,7 +4,6 @@ import word_characteristics as wc
 from file_names import Files
 from os import listdir
 from truth import SENTENCE_SEARCH_DISTANCE
-from heapq import nlargest
 
 MODALS = ['can','could','may','must','might','will','would','shall','should']
 BE     = ['be']
@@ -52,22 +51,49 @@ class AllSentences:
     def get_sentence(self, i):
         return self.sentences[i]
 
-    def set_possible_ants(self, trigger):
+    def set_possible_ants(self, trigger, pos_tests, search_distance=99):
         for sentnum in range(max(0, trigger.sentnum - SENTENCE_SEARCH_DISTANCE), trigger.sentnum+1):
             #Every possible linear combination of words.
             # for i in range(len(self.sentences[sentnum])):
             #     for j in range(i+1, len(self.sentences[sentnum])):
             #         trigger.add_possible_ant(self.idxs_to_ant(sentnum, i, j, trigger))
-            for i in range(len(self.sentences[sentnum])):
-                tag = self.sentences[sentnum].pos[i]
-                if wc.is_verb(tag) or wc.is_predicative(tag) or wc.is_adjective(tag):
-                    for j in range(i+1, len(self.sentences[sentnum])):
-                        trigger.add_possible_ant(self.idxs_to_ant(sentnum, i, j, trigger))
 
+            #Slightly more constrained but needs to be even more constrained.
+            functions = [f for f in pos_tests if hasattr(f, '__call__')]
+            for i in range(len(self.sentences[sentnum])):
+                 tag = self.sentences[sentnum].pos[i]
+                 if True in [f(tag) for f in functions]:
+                     for j in range(i+1, min(i+search_distance,len(self.sentences[sentnum]))):
+                                    # len(nt.get_nearest_phrase(nt.maketree(self.sentences[sentnum]['tree'][0]), i, [pos_tests]))):
+                         trigger.add_possible_ant(self.idxs_to_ant(sentnum, i, j, trigger))
+
+            #Lets use the tree to decrease the number of dumb candidates.
+            phrases = [p for p in pos_tests if type(p)==str]
+            tree = nt.maketree(self.get_sentence(sentnum)['tree'][0])
+            tree_pos = nt.getsmallestsubtrees(tree)
+            tree_words = tree.leaves()
+            leaves_dict = { (tree_pos[i].label(), tree_words[i]) : i+1 for i in range(len(tree_words))}
+            for pos in phrases:
+                for position in nt.phrase_positions_in_tree(tree, pos):
+                    start = None
+                    for w in nt.getsmallestsubtrees(tree[position]):
+                        # print w.label(), w[0]
+                        end = (w.label(), w[0])
+                        if not start:
+                            start = end
+                        if sentnum == trigger.sentnum and leaves_dict[end] == trigger.wordnum \
+                                or wc.is_punctuation(end[0]):
+                            break
+                        trigger.add_possible_ant(self.idxs_to_ant(sentnum, leaves_dict[start], leaves_dict[end]+1, trigger))
+                        # print 'added poss_ant: %d to %d'%(leaves_dict[start], leaves_dict[end]+1),trigger.possible_ants[-1]
+                    # raise Finished()
 
     def idxs_to_ant(self, sentnum, start, end, trigger):
         sentdict = self.sentences[sentnum]
         return Antecedent(start, trigger, SubSentDict(sentdict.words[start:end], sentdict.pos[start:end], sentdict.lemmas[start:end]))
+
+    def get_sentence_tree(self, i):
+        return nt.maketree(self.sentences[i]['tree'][0])
 
 class XMLMatrix:
     """ A matrix of SentDicts built by getting passed a Stanford CoreNLP XML file. """
@@ -485,6 +511,7 @@ class Antecedent:
         self.sub_sentdict = sub_sentdict
         self.section = section
         self.context = None
+        self.score = None
         self.x = None # features
 
     def __repr__(self):

@@ -61,6 +61,12 @@ def is_predicative(tag):
 def is_noun(tag):
     return tag in ['NN','NNS','NNP','NNPS','WP','PRP','PRP$','DT']
 
+def is_adverb(tag):
+    return tag == 'RB'
+
+def is_punctuation(tag):
+    return tag in ['.',',','-','--','\'','\"']
+
 """ My features. """
 def aux_ccommands_verb(sentdict, aux, tree, word_positions_in_tree):
     subtrees = nt.getsmallestsubtrees(tree)
