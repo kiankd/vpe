@@ -143,7 +143,6 @@ class AntecedentClassifier:
                 f.write(x+'\n')
             f.close()
 
-
     def fit(self):
         for trigger in self.train_triggers:
             print trigger
