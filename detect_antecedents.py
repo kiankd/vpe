@@ -1,11 +1,16 @@
 import vpe_objects as vpe
 import numpy as np
 import word_characteristics as wc
+import antecedent_vector_creation as avc
+import truth
 from heapq import nlargest
 from os import listdir
+from pyprind import ProgBar
+from optimize_mira_dual import update_weights
+
 
 class AntecedentClassifier:
-    def __init__(self, train_start, train_end, test_start, test_end):
+    def __init__(self, train_start, train_end, test_start, test_end, learn_rate=1.0):
         self.sentences = vpe.AllSentences()
         self.annotations = vpe.Annotations()
         self.file_names = vpe.Files()
@@ -15,17 +20,23 @@ class AntecedentClassifier:
         self.train_triggers = []
         self.test_triggers = []
 
-        self.predictions = None
-
         self.start_train = train_start
         self.end_train = train_end
         self.start_test = test_start
         self.end_test = test_end
-        self.weights = None
+        self.W = []
+        self.learn_rate = learn_rate
 
         self.missed_vpe = 0
+        self.num_features = 0
 
+    def initialize(self, pos_tests, sd=99):
         self.import_data()
+        print 'Generating possible antecedents...'
+        self.generate_possible_ants(pos_tests,sd)
+        print 'Building feature vectors...'
+        self.build_feature_vectors()
+        self.initialize_weights()
 
     def import_data(self, test=None):
         dirs = listdir(self.file_names.XML_MRG)
@@ -81,16 +92,27 @@ class AntecedentClassifier:
             trigger.possible_ants = []
             self.sentences.set_possible_ants(trigger, pos_tests, search_distance=sd)
 
-    def bestk_ants(self, trigger, k=5):
-        for ant in trigger.possible_ants:
-            ant.score = self.score(ant.x)
-        return nlargest(k, trigger.possible_ants, key=score)
+    def bestk_ants(self, trigger, w, k=5, random=0):
+        for a in range(len(trigger.possible_ants)):
+            trigger.possible_ants[a].set_score(w)
+        return nlargest(k, trigger.possible_ants, key=vpe.Antecedent.get_score)
 
     def build_feature_vectors(self):
+        all_pos_tags = truth.extractdatafromfile(truth.EACH_UNIQUE_POS_FILE)
         for trigger in self.train_triggers + self.test_triggers:
             for ant in trigger.possible_ants:
-                ant.x = avc.build_feature_vector(ant,trigger)
+                ant.x = avc.build_feature_vector(ant, trigger, self.sentences, all_pos_tags)
+                if self.num_features == 0:
+                    self.num_features = len(ant.x)
+                if len(ant.x) != self.num_features:
+                    raise Exception("DIFFERENT NUMBER OF FEATURES SHIT")
+            trigger.gold_ant.x = avc.build_feature_vector(ant, trigger, self.sentences, all_pos_tags)
         return
+
+    # noinspection PyArgumentList
+    def initialize_weights(self, seed=1917):
+        np.random.seed(seed)
+        self.W.append(np.random.rand(len(self.train_triggers[0].possible_ants[0].x)))
 
     def debug_ant_selection(self, verbose=False, write_to_file=None):
         missed = 0
@@ -143,12 +165,53 @@ class AntecedentClassifier:
                 f.write(x+'\n')
             f.close()
 
-    def fit(self):
-        for trigger in self.train_triggers:
-            print trigger
+    def fit(self, epochs=5, verbose=True, k=5, random=0, debug=False):
+        i=0
+        for n in range(epochs):
+            for trigger in self.train_triggers:
+                bestk = self.bestk_ants(trigger, self.W[i], k=k, random=random)
+                self.W.append( update_weights(self.W[i], bestk, trigger.gold_ant, self.loss_function, C=self.learn_rate) )
+                i+=1
+            if debug and n>0:
+                print 'Epoch %d - Average error: %0.2f'%(n, self.accuracy(self.predict()))
+                print 'Avg difference: %0.3f'%(np.mean(self.W[i]-self.W[0]))
+
+
+    def loss_function(self, gold_ant, proposed_ant):
+        """
+        @type gold_ant: vpe.Antecedent
+        @type proposed_ant: vpe.Antecedent
+        """
+        gold_vals = gold_ant.word_pos_tuples()
+        proposed_vals = proposed_ant.word_pos_tuples()
+        tp = float(len([tup for tup in proposed_vals if tup in gold_vals]))
+        fp = float(len([tup for tup in proposed_vals if not tup in gold_vals]))
+        fn = float(len([tup for tup in gold_vals if not tup in proposed_vals]))
+        precision = tp/(tp+fp)
+        recall = tp/(tp+fn)
+        try:
+            return 1.0 - (2.0*precision*recall)/(precision+recall)
+        except ZeroDivisionError:
+            return 1.0
+
+    def predict(self):
+        # print self.W
+        # print sum(self.W)/len(self.W)
+        weights = np.array(sum(self.W)/len(self.W))
+        # print weights
+        predictions = []
+        for trigger in self.test_triggers:
+            predictions.append(self.bestk_ants(trigger, weights, k=1)[0])
+        return predictions
+
+    def accuracy(self, predictions):
+        losses = []
+        for ant in predictions:
+            losses.append(self.loss_function(ant.trigger.gold_ant, ant))
+        return float(np.mean(losses, dtype=np.float64))
 
 if __name__ == '__main__':
-    a = AntecedentClassifier(0,14,-1,-1)
+    a = AntecedentClassifier(0,0,0,0, learn_rate=1.0)
     print 'We missed %d vpe instances.'%a.missed_vpe
     # for trig in a.train_triggers:
     #     print '--------------------------------------------'
@@ -159,19 +222,9 @@ if __name__ == '__main__':
     # print '---------'
 
     # Using functional programming here because it's nice
-    a.generate_possible_ants(['VP','ADJ-PRD','NP-PRD', wc.is_adjective, wc.is_verb], sd=5)
-    a.debug_ant_selection(verbose=False, write_to_file='antecedent_generation.txt')
+    pos_tests = ['VP','ADJ-PRD','NP-PRD', wc.is_adjective, wc.is_verb]
+    a.initialize(pos_tests, sd=5)
 
-    # a.generate_possible_ants(['VP','NP','ADJP'])
-    # a.debug_ant_selection()
-    # a.generate_possible_ants(['VP','NP'])
-    # a.debug_ant_selection()
-    # a.generate_possible_ants(['VP'])
-    # a.debug_ant_selection()
-
-    # a.generate_possible_ants([wc.is_verb, wc.is_adverb, wc.is_adjective])
-    # a.debug_ant_selection()
-    # a.generate_possible_ants([wc.is_verb, wc.is_adjective])
-    # a.debug_ant_selection()
-    # a.generate_possible_ants([wc.is_verb])
-    # a.debug_ant_selection()
+    a.fit(epochs=500, debug=True, k=10)
+    print np.array(sum(a.W)/len(a.W))
+    print a.W[-1]

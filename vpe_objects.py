@@ -4,6 +4,7 @@ import word_characteristics as wc
 from file_names import Files
 from os import listdir
 from truth import SENTENCE_SEARCH_DISTANCE
+from numpy import dot
 
 MODALS = ['can','could','may','must','might','will','would','shall','should']
 BE     = ['be']
@@ -65,7 +66,9 @@ class AllSentences:
                  if True in [f(tag) for f in functions]:
                      for j in range(i+1, min(i+search_distance,len(self.sentences[sentnum]))):
                                     # len(nt.get_nearest_phrase(nt.maketree(self.sentences[sentnum]['tree'][0]), i, [pos_tests]))):
-                         trigger.add_possible_ant(self.idxs_to_ant(sentnum, i, j, trigger))
+                         ant = self.idxs_to_ant(sentnum, i, j, trigger)
+                         if len(ant.sub_sentdict) > 0:
+                            trigger.add_possible_ant(ant)
 
             #Lets use the tree to decrease the number of dumb candidates.
             phrases = [p for p in pos_tests if type(p)==str]
@@ -84,7 +87,9 @@ class AllSentences:
                         if sentnum == trigger.sentnum and leaves_dict[end] == trigger.wordnum \
                                 or wc.is_punctuation(end[0]):
                             break
-                        trigger.add_possible_ant(self.idxs_to_ant(sentnum, leaves_dict[start], leaves_dict[end]+1, trigger))
+                        ant = self.idxs_to_ant(sentnum, leaves_dict[start], leaves_dict[end]+1, trigger)
+                        if len(ant.sub_sentdict) > 0:
+                            trigger.add_possible_ant(ant)
                         # print 'added poss_ant: %d to %d'%(leaves_dict[start], leaves_dict[end]+1),trigger.possible_ants[-1]
                     # raise Finished()
 
@@ -299,6 +304,12 @@ class SubSentDict:
         else:
             raise WrongClassEquivalenceException()
 
+    def __len__(self):
+        return len(self.words)
+
+    def __repr__(self):
+        return str((self.words,self.pos))
+
 class SentDict:
     """ Dictionary for any sentence from a Stanford CoreNLP XML file. Can be modified to have more attributes. """
     def __init__(self, sentence, f_name=None, raw=False):
@@ -512,7 +523,6 @@ class Antecedent:
         self.trigger = trigger
         self.sub_sentdict = sub_sentdict
         self.section = section
-        self.context = None
         self.score = None
         self.x = None # features
 
@@ -521,6 +531,15 @@ class Antecedent:
         for w in self.sub_sentdict.words:
             ret += w+' '
         return ret
+
+    def set_score(self, weights):
+        self.score = dot(self.x, weights)
+
+    def get_score(self):
+        return self.score
+
+    def word_pos_tuples(self):
+        return zip(self.sub_sentdict.pos, self.sub_sentdict.words)
 
 class RawAntecedent:
     """ Only exists for extracting the annotations from the raw XML files. """

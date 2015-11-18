@@ -13,6 +13,21 @@ def getroot(subtree):
         crt = crt.parent()
     return crt
 
+def find_subtree_phrases(t, phrases):
+    """ You should really only use this because it is the best. """
+    subtrees = []
+    def recurse(t, phrases):
+        try:
+            t.label()
+        except AttributeError:
+            return
+        if t.label() in phrases:
+            subtrees.append(t)
+        for child in t:
+            recurse(child, phrases)
+    recurse(t, phrases)
+    return subtrees
+
 # To test if subtree1 dominates subtree2, we go up the tree from subtree2 until we either reach:
 # the root, in which case we return false; or subtree1, in which case we return true.
 def dominates(t, subtree1, subtree2):
@@ -84,12 +99,14 @@ def getwordtreepositions(t):
     for pos in t.treepositions():
         if isinstance(t[pos],str):
             tree_pos_list.append(pos)
-
     return tree_pos_list
 
 # This will allow us to use the trees that correspond to the words, i.e. (VBZ is) instead of just 'is'
 def getsmallestsubtrees(t):
     return [subtree for subtree in t.subtrees(lambda t: t.height() == 2)]
+
+def pos_word_tuples(t):
+    return [(subtree.label(),subtree[0]) for subtree in t.subtrees(lambda t: t.height() == 2)]
 
 def getsmallestsubtreepositions(t, subtree_list = None):
     subtree_positions = []

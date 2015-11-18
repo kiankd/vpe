@@ -1,6 +1,17 @@
 from gurobipy import *
 import numpy as np
 import math
+from cStringIO import StringIO
+import sys
+
+class Capturing(list):
+    def __enter__(self):
+        self._stdout = sys.stdout
+        sys.stdout = self._stringio = StringIO()
+        return self
+    def __exit__(self, *args):
+        self.extend(self._stringio.getvalue().splitlines())
+        sys.stdout = self._stdout
 
 def norm(x):
     return quicksum(xi * xi for xi in x)
@@ -23,10 +34,12 @@ def update_weights(old, best, gold, L, C=1.0):
     m.update()
 
     # Building the objective function
-    try:
-        diffs = [list(gold - best[k]) for k in range(primal_constraints)]
-    except TypeError:
-        diffs = [list(np.array(gold) - np.array(best[k])) for k in range(primal_constraints)]
+    # print 'bestk:',best
+    # print 'gold:',gold
+    # print 'best[0].x',best[0].x
+    # print 'gold.x',gold.x
+
+    diffs = [(gold.x - best[k].x) for k in range(primal_constraints)]
 
     s = []
     for k in range(primal_constraints):
@@ -38,10 +51,11 @@ def update_weights(old, best, gold, L, C=1.0):
     m.setObjective(obj, GRB.MAXIMIZE)
     m.addConstr(quicksum(alpha) <= C, "c1") # Very simple constraint based on learning rate.
 
-    m.optimize()
+    with Capturing() as output:
+        m.optimize()
 
     # Weight update step:
-    return old + np.sum(alpha[k].x * np.array(diffs[k]) for k in range(primal_constraints))
+    return old + np.sum(alpha[k].x * diffs[k] for k in range(primal_constraints))
 
 if __name__ == '__main__':
     old = np.array([1.0, 1.0])
