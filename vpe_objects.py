@@ -32,7 +32,7 @@ class Finished:
 class WrongClassEquivalenceException:
     def __init__(self): pass
 
-""" ---- Data imporation classes. ---- """
+""" ---- Data importation classes. ---- """
 class AllSentences:
     """ A class that contains all of the StanfordCoreNLP sentences. """
     def __init__(self):
@@ -50,6 +50,9 @@ class AllSentences:
             self.sentences.append(sentdict)
 
     def get_sentence(self, i):
+        """
+        @type return: SentDict
+        """
         return self.sentences[i]
 
     def set_possible_ants(self, trigger, pos_tests, search_distance=99):
@@ -102,7 +105,7 @@ class AllSentences:
 
 class XMLMatrix:
     """ A matrix of SentDicts built by getting passed a Stanford CoreNLP XML file. """
-    def __init__(self, xml_file, path, pos_file=False):
+    def __init__(self, xml_file, path, pos_file=False, get_deps=False):
         if not xml_file in listdir(path):
             raise IOError
 
@@ -121,7 +124,7 @@ class XMLMatrix:
             except TypeError:
                 break
             try:
-                s = SentDict(sentence, f_name=xml_file)
+                s = SentDict(sentence, f_name=xml_file, get_deps=get_deps)
                 self.matrix.append(s)
             except EmptySentDictException:
                 continue
@@ -289,14 +292,15 @@ class XMLMatrix:
     def idxs_to_ant(self, start, end, trigger, sentnum_modifier):
         sentdict = self.matrix[start[0]]
         i,j = start[1],end[1]+1
-        return Antecedent(start[0]+sentnum_modifier+1, trigger, SubSentDict(sentdict.words[i:j], sentdict.pos[i:j], sentdict.lemmas[i:j]))
+        return Antecedent(start[0]+sentnum_modifier+1, trigger, SubSentDict(sentdict.words[i:j], sentdict.pos[i:j], sentdict.lemmas[i:j]), i, j)
 
 class SubSentDict:
     """Antecedents have this."""
-    def __init__(self, words, pos, lemmas):
+    def __init__(self, words, pos, lemmas, start=None, end=None):
         self.words = words
         self.pos = pos
         self.lemmas = lemmas
+        self.start,self.end = start,end
 
     def __eq__(self, other):
         if type(self) is type(other):
@@ -312,7 +316,7 @@ class SubSentDict:
 
 class SentDict:
     """ Dictionary for any sentence from a Stanford CoreNLP XML file. Can be modified to have more attributes. """
-    def __init__(self, sentence, f_name=None, raw=False):
+    def __init__(self, sentence, f_name=None, raw=False, get_deps=False):
         self.file = f_name
         self.sentnum = int(sentence.get('id'))
         self.raw = raw
@@ -323,6 +327,13 @@ class SentDict:
                 self.words = ['ROOT']+[word.text for word in sentence.iter('word')]
                 self.lemmas = ['root']+[lemma.text for lemma in sentence.iter('lemma')]
                 self.pos = ['root']+[pos.text for pos in sentence.iter('POS')]
+                if get_deps:
+                    for dep_type in sentence.iter('dependencies'):
+                        if dep_type.get('type') == "collapsed-ccprocessed-dependencies": #this only happens once
+                            names = [dep.get('type') for dep in dep_type.iter('dep')]
+                            govs = [int(gov.get('idx')) for gov in dep_type.iter('governor')]
+                            depends = [int(d.get('idx')) for d in dep_type.iter('dependent')]
+                            self.dependencies = [Dependency(names[i], govs[i], depends[i]) for i in range(len(names))]
             else:
                 raise EmptySentDictException()
         else:
@@ -370,6 +381,36 @@ class SentDict:
 
     def get_nltk_tree(self):
         return nt.maketree(self.tree_text[0])
+
+    def chunked_dependencies(self, i, j, dep_names=('prep','adv','dobj','nsubj','nmod')):
+        """Here we will return a list of all relevant dependency clusters between word i and word j."""
+        deps = [dep for dep in self.dependencies if ((i <= dep.gov <= j) and (i <= dep.dependent <= j))]
+
+        # Dependency graph.
+        graph = {dep.gov:[] for dep in deps}
+        for dep in deps:
+            graph[dep.gov].append(dep)
+
+        # Here we get the dependency constituents for each desired dependency in dep_names.
+        chunks = []
+        for gov,dep_list in graph.iteritems():
+            for dep in dep_list:
+                for potential in dep_names:
+                    if dep.name.startswith(potential) and not dep.name == 'nsubjpass':
+                        i,j = min(gov,dep.dependent), max(gov+1,dep.dependent+1)
+                        chunks.append( {'name':dep.name, 'sentdict':SubSentDict( self.words[i:j], self.pos[i:j],
+                                                                                 self.lemmas[i:j], start=i, end=j)})
+                        break
+        return chunks
+
+class Dependency:
+    def __init__(self, name, gov, dependent):
+        self.name=name
+        self.gov=gov
+        self.dependent=dependent
+
+    def __repr__(self):
+        return '[%s : (%s,%s)]'%(self.name, self.gov, self.dependent)
 
 class Annotations:
     """ A class that contains all of the annotations. It is abstract enough to hold Nielson annotations. """
@@ -517,7 +558,7 @@ class RawAuxiliary:
 
 """" ---- Antecedent classes. ---- """
 class Antecedent:
-    def __init__(self, sentnum, trigger, sub_sentdict, section=-1):
+    def __init__(self, sentnum, trigger, sub_sentdict, start, end, section=-1):
         self.sentnum = sentnum
         self.subtree = None
         self.trigger = trigger
@@ -525,6 +566,8 @@ class Antecedent:
         self.section = section
         self.score = None
         self.x = None # features
+        self.start = start
+        self.end = end
 
     def __repr__(self):
         ret = ''

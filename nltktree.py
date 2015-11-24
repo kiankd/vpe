@@ -14,7 +14,7 @@ def getroot(subtree):
     return crt
 
 def find_subtree_phrases(t, phrases):
-    """ You should really only use this because it is the best. """
+    """ This is the best function here. """
     subtrees = []
     def recurse(t, phrases):
         try:
@@ -27,6 +27,20 @@ def find_subtree_phrases(t, phrases):
             recurse(child, phrases)
     recurse(t, phrases)
     return subtrees
+
+def get_nearest_clause(tree, start, end=None):
+    clauses = ['S', 'SBAR', 'SQ', 'SBARQ','SINV']
+
+    if not end:
+        subtree = getsmallestsubtrees(tree)[start]
+    else:
+        subtrees = getsmallestsubtrees(tree)
+        subtree,subtree2 = subtrees[start],subtrees[end]
+
+    crt = subtree
+    while (not crt is tree) and (not crt.label() in clauses) and ((not end) or subtree2 in tree):
+        crt = crt.parent()
+    return crt
 
 # To test if subtree1 dominates subtree2, we go up the tree from subtree2 until we either reach:
 # the root, in which case we return false; or subtree1, in which case we return true.

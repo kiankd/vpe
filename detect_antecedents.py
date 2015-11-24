@@ -6,11 +6,16 @@ import truth
 from heapq import nlargest
 from os import listdir
 from pyprind import ProgBar
-from optimize_mira_dual import update_weights
+from optimize_mira_dual import update_weights,Capturing
+from random import randrange
+from matplotlib import pyplot as plt
 
+def shuffle(list_):
+    np.random.shuffle(list_)
+    return list_
 
 class AntecedentClassifier:
-    def __init__(self, train_start, train_end, test_start, test_end, learn_rate=1.0):
+    def __init__(self, train_start, train_end, test_start, test_end, learn_rate=1.0, C=1.0):
         self.sentences = vpe.AllSentences()
         self.annotations = vpe.Annotations()
         self.file_names = vpe.Files()
@@ -24,11 +29,20 @@ class AntecedentClassifier:
         self.end_train = train_end
         self.start_test = test_start
         self.end_test = test_end
-        self.W = []
+        self.W_avg = None
+        self.W_old = None
         self.learn_rate = learn_rate
+        self.C = C
 
         self.missed_vpe = 0
         self.num_features = 0
+
+        self.norms = []
+        self.feature_vals = []
+        self.feature_names = []
+        self.random_features = []
+        self.accs = []
+        self.diffs = []
 
     def initialize(self, pos_tests, sd=99):
         self.import_data()
@@ -39,6 +53,7 @@ class AntecedentClassifier:
         self.initialize_weights()
 
     def import_data(self, test=None):
+        """Import data from our XML directory and find all of the antecedents. Takes a bit of time."""
         dirs = listdir(self.file_names.XML_MRG)
         dirs.sort()
 
@@ -57,7 +72,7 @@ class AntecedentClassifier:
                     if not test or (test and f in test):
                         # Here we are now getting the non-MRG POS file that we had neglected to get before.
                         try:
-                            mrg_matrix = vpe.XMLMatrix(f+'.mrg.xml', self.file_names.XML_MRG+subdir)
+                            mrg_matrix = vpe.XMLMatrix(f+'.mrg.xml', self.file_names.XML_MRG+subdir, get_deps=True)
                         except IOError:
                             continue
                             # mrg_matrix = XMLMatrix(f+'.pos.xml', self.file_names.XML_POS, pos_file=True)
@@ -85,34 +100,43 @@ class AntecedentClassifier:
             dnum += 1
 
     def score(self, ant):
+        """Multiply the weight vector times the antcedent feature vector."""
         return np.dot(self.weights, ant.x)
 
     def generate_possible_ants(self, pos_tests, sd=99):
+        """Generate all candidate antecedents."""
         for trigger in self.train_triggers + self.test_triggers:
             trigger.possible_ants = []
             self.sentences.set_possible_ants(trigger, pos_tests, search_distance=sd)
 
-    def bestk_ants(self, trigger, w, k=5, random=0):
+    def bestk_ants(self, trigger, w, k=5):
+        """Return the best k antecedents given the weight vector w with respect to the score attained."""
         for a in range(len(trigger.possible_ants)):
             trigger.possible_ants[a].set_score(w)
         return nlargest(k, trigger.possible_ants, key=vpe.Antecedent.get_score)
 
-    def build_feature_vectors(self):
-        all_pos_tags = truth.extractdatafromfile(truth.EACH_UNIQUE_POS_FILE)
+    def build_feature_vectors(self, verbose=True):
+        """Build each feature vector for each possible antecedent and each gold antecedent - takes time."""
+        if verbose:
+            bar = ProgBar(len(self.train_triggers+self.test_triggers)*len(self.train_triggers[0].possible_ants))
+
+        all_pos_tags = truth.extractdatafromfile(truth.EACH_UNIQUE_POS_FILE) # We only want to import this file once.
         for trigger in self.train_triggers + self.test_triggers:
             for ant in trigger.possible_ants:
                 ant.x = avc.build_feature_vector(ant, trigger, self.sentences, all_pos_tags)
                 if self.num_features == 0:
                     self.num_features = len(ant.x)
                 if len(ant.x) != self.num_features:
-                    raise Exception("DIFFERENT NUMBER OF FEATURES SHIT")
+                    raise Exception("DIFFERENT NUMBER OF FEATURES FOR DIFFERENT ANTECEDENTS!")
+                if verbose:
+                    bar.update()
             trigger.gold_ant.x = avc.build_feature_vector(ant, trigger, self.sentences, all_pos_tags)
         return
 
     # noinspection PyArgumentList
     def initialize_weights(self, seed=1917):
         np.random.seed(seed)
-        self.W.append(np.random.rand(len(self.train_triggers[0].possible_ants[0].x)))
+        self.W_old = (np.random.rand(len(self.train_triggers[0].possible_ants[0].x)))
 
     def debug_ant_selection(self, verbose=False, write_to_file=None):
         missed = 0
@@ -165,17 +189,21 @@ class AntecedentClassifier:
                 f.write(x+'\n')
             f.close()
 
-    def fit(self, epochs=5, verbose=True, k=5, random=0, debug=False):
+    def fit(self, epochs=5, verbose=True, k=5, features_to_analyze=5):
         i=0
         for n in range(epochs):
-            for trigger in self.train_triggers:
-                bestk = self.bestk_ants(trigger, self.W[i], k=k, random=random)
-                self.W.append( update_weights(self.W[i], bestk, trigger.gold_ant, self.loss_function, C=self.learn_rate) )
+            for trigger in shuffle(self.train_triggers):
+                bestk = self.bestk_ants(trigger, self.W_old, k=k)
+                self.analyze(self.W_old, features_to_analyze)
+                self.W_old = update_weights(self.W_old, bestk, trigger.gold_ant, self.loss_function, C=self.C)
+                self.W_avg = (1.0-(1.0/(i+1))) * self.W_avg + (1.0/(i+1)) * self.W_old
                 i+=1
-            if debug and n>0:
-                print 'Epoch %d - Average error: %0.2f'%(n, self.accuracy(self.predict()))
-                print 'Avg difference: %0.3f'%(np.mean(self.W[i]-self.W[0]))
+            if verbose and n>0:
+                self.accs.append(self.accuracy(self.predict()))
+                print 'Epoch %d - error: %0.2f'%(n, self.accs[-1])
 
+                self.diffs.append(np.mean((self.W_avg-self.W_old)**2))
+                print 'Difference btwen avg vector w_old: %0.3f'%(self.diffs[-1])
 
     def loss_function(self, gold_ant, proposed_ant):
         """
@@ -195,13 +223,9 @@ class AntecedentClassifier:
             return 1.0
 
     def predict(self):
-        # print self.W
-        # print sum(self.W)/len(self.W)
-        weights = np.array(sum(self.W)/len(self.W))
-        # print weights
         predictions = []
         for trigger in self.test_triggers:
-            predictions.append(self.bestk_ants(trigger, weights, k=1)[0])
+            predictions.append(self.bestk_ants(trigger, self.W_avg, k=1)[0])
         return predictions
 
     def accuracy(self, predictions):
@@ -210,21 +234,72 @@ class AntecedentClassifier:
             losses.append(self.loss_function(ant.trigger.gold_ant, ant))
         return float(np.mean(losses, dtype=np.float64))
 
+    def analyze(self, w, num_features):
+        self.norms.append(np.linalg.norm(w))
+
+        if not self.feature_vals:
+            self.feature_vals = [[] for _ in range(num_features)]
+            self.feature_names = ['Bias weight']
+            for i in range(num_features-2):
+                self.random_features.append(randrange(1,len(w)))
+                self.feature_names.append('Rand_feature %d'%self.random_features[i])
+            self.feature_names.append('NP dot product/norm')
+
+        self.feature_vals[0].append(w[0])
+        for i in range(num_features-2):
+            self.feature_vals[i+1].append(w[self.random_features[i]])
+        self.feature_vals[-1].append(w[-1])
+
+    def make_graphs(self):
+        plt.figure(1)
+        plt.title('Weight Vector 2-Norm Change')
+        plt.plot(range(len(self.norms)), self.norms, 'bo')
+        plt.savefig('norm_change1.png', bbox_inches='tight')
+        plt.show()
+
+        colors = ['b','y','k','m','r','g']
+        plt.figure(2)
+        plt.title('Exact Feature Value Change')
+        for i in range(len(self.feature_vals)):
+            plt.plot(range(len(self.feature_vals[i])), self.feature_vals[i],
+                     colors[i%len(colors)]+'0', label=self.feature_names[i])
+        plt.legend()
+        plt.savefig('feature_value_change1.png', bbox_inches='tight')
+        plt.show()
+
+        plt.figure(3)
+        plt.title('Accuracy Change')
+        plt.plot(range(len(self.accs)), self.accs, 'bo')
+        plt.savefig('accuracy_change1.png', bbox_inches='tight')
+        plt.show()
+
+        plt.figure(4)
+        plt.title('Squared Weight Vector Change')
+        plt.plot(range(len(self.diffs)), self.diffs, 'bo')
+        plt.savefig('weight_vector_change1.png', bbox_inches='tight')
+        plt.show()
+
 if __name__ == '__main__':
-    a = AntecedentClassifier(0,0,0,0, learn_rate=1.0)
+    a = AntecedentClassifier(0,0,0,0)
+    a.import_data()
     print 'We missed %d vpe instances.'%a.missed_vpe
-    # for trig in a.train_triggers:
-    #     print '--------------------------------------------'
-    #     print 'TRIGGER',trig
-    #     print a.sentences.get_sentence(trig.sentnum)
-    #     print 'ANTECEDENT:',trig.gold_ant
-    #     print a.sentences.get_sentence(trig.gold_ant.sentnum)
-    # print '---------'
+    for trig in a.train_triggers:
+        print '--------------------------------------------'
+        print 'TRIGGER',trig
+        print a.sentences.get_sentence(trig.sentnum)
+        # print a.sentences.get_sentence(trig.sentnum).dependencies
+        print 'ANTECEDENT:',trig.gold_ant
+        print a.sentences.get_sentence(trig.gold_ant.sentnum)
+    print '---------'
 
-    # Using functional programming here because it's nice
-    pos_tests = ['VP','ADJ-PRD','NP-PRD', wc.is_adjective, wc.is_verb]
-    a.initialize(pos_tests, sd=5)
+    s = a.sentences.get_sentence(1)
+    chunks = s.chunked_dependencies(0,len(s)-1)
+    print chunks
 
-    a.fit(epochs=500, debug=True, k=10)
-    print np.array(sum(a.W)/len(a.W))
-    print a.W[-1]
+    # # Using functional programming here because it's nice
+    # pos_tests = ['VP','ADJ-PRD','NP-PRD', wc.is_adjective, wc.is_verb]
+    # a.initialize(pos_tests, sd=5)
+    #
+    # a.fit(epochs=500, k=10, verbose=True)
+    # a.make_graphs()
+

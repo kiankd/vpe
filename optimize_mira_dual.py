@@ -1,10 +1,11 @@
 from gurobipy import *
+from cStringIO import StringIO
 import numpy as np
 import math
-from cStringIO import StringIO
 import sys
 
 class Capturing(list):
+    """All this does is stop gurbipy from printing the results of each optimization."""
     def __enter__(self):
         self._stdout = sys.stdout
         sys.stdout = self._stringio = StringIO()
@@ -17,6 +18,7 @@ def norm(x):
     return quicksum(xi * xi for xi in x)
 
 def slow_multiply(a, constants):
+    """Multiplies a variable times each constant and returns the sum."""
     c = []
     for i in range(len(constants)):
         c.append(a * constants[i])

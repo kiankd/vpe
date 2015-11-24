@@ -1,6 +1,8 @@
 import nltktree as nt
 import numpy
 
+
+
 def build_feature_vector(ant, trigger, all_sentences, all_tags):
     """
     @type ant: vpe_objects.Antecedent
@@ -34,8 +36,8 @@ def ant_trigger_relationship(ant, trigger, sentences, all_tags):
     ant_np = numpy.array(nearest_ant_np(ant, sentences, all_tags))
     trig_np = numpy.array(nearest_trig_np(trigger, sentences, all_tags))
 
-    v.append(numpy.dot(ant_np, trig_np) / (numpy.linalg.norm(ant_np) * numpy.linalg.norm(trig_np)))
     v += list(abs(ant_np - trig_np))
+    v.append(numpy.dot(ant_np, trig_np) / (numpy.linalg.norm(ant_np) * numpy.linalg.norm(trig_np)))
     return v
 
 def nearest_trig_np(trig, sentences, all_tags):
