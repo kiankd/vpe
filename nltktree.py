@@ -38,7 +38,7 @@ def get_nearest_clause(tree, start, end=None):
         subtree,subtree2 = subtrees[start],subtrees[end]
 
     crt = subtree
-    while (not crt is tree) and (not crt.label() in clauses) and ((not end) or subtree2 in tree):
+    while (not crt is tree) and (not crt.label() in clauses) and ((not end) or not subtree2 in tree):
         crt = crt.parent()
     return crt
 

@@ -1,8 +1,6 @@
 import nltktree as nt
 import numpy
 
-
-
 def build_feature_vector(ant, trigger, all_sentences, all_tags):
     """
     @type ant: vpe_objects.Antecedent
@@ -91,7 +89,10 @@ def nearest_ant_np(ant, sentences, all_tags):
 
     # print closest_np
 
-    np_pos = [subtree.label() for subtree in nt.getsmallestsubtrees(closest_np)]
+    try:
+        np_pos = [subtree.label() for subtree in nt.getsmallestsubtrees(closest_np)]
+    except AttributeError:
+        np_pos = []
 
     return encode_pos_tag_frequencies(np_pos, all_tags)
 
@@ -104,5 +105,3 @@ def encode_pos_tag_frequencies(pos_list, all_tags):
         return [0.0 for _ in all_tags]
 
     return [float(pos_list.count(tag))/len(pos_list) for tag in all_tags]
-
-

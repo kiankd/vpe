@@ -9,6 +9,8 @@ from pyprind import ProgBar
 from optimize_mira_dual import update_weights,Capturing
 from random import randrange
 from matplotlib import pyplot as plt
+from alignment import alignment_matrix
+from copy import copy
 
 def shuffle(list_):
     np.random.shuffle(list_)
@@ -44,10 +46,10 @@ class AntecedentClassifier:
         self.accs = []
         self.diffs = []
 
-    def initialize(self, pos_tests, sd=99):
+    def initialize(self, pos_tests, sd=99, test=False):
         self.import_data()
         print 'Generating possible antecedents...'
-        self.generate_possible_ants(pos_tests,sd)
+        self.generate_possible_ants(pos_tests,sd,test=test)
         print 'Building feature vectors...'
         self.build_feature_vectors()
         self.initialize_weights()
@@ -103,8 +105,15 @@ class AntecedentClassifier:
         """Multiply the weight vector times the antcedent feature vector."""
         return np.dot(self.weights, ant.x)
 
-    def generate_possible_ants(self, pos_tests, sd=99):
+    def generate_possible_ants(self, pos_tests, sd=99, test=False):
         """Generate all candidate antecedents."""
+        if test:
+            for trigger in self.train_triggers + self.test_triggers:
+                trigger.possible_ants = []
+                self.sentences.set_possible_ants(trigger, pos_tests, search_distance=sd)
+                trigger.possible_ants = [trigger.gold_ant] + trigger.possible_ants[0:5]
+            return
+
         for trigger in self.train_triggers + self.test_triggers:
             trigger.possible_ants = []
             self.sentences.set_possible_ants(trigger, pos_tests, search_distance=sd)
@@ -118,25 +127,36 @@ class AntecedentClassifier:
     def build_feature_vectors(self, verbose=True):
         """Build each feature vector for each possible antecedent and each gold antecedent - takes time."""
         if verbose:
-            bar = ProgBar(len(self.train_triggers+self.test_triggers)*len(self.train_triggers[0].possible_ants))
+            # bar = ProgBar(len(self.train_triggers+self.test_triggers)*len(self.train_triggers[0].possible_ants))
+            bar = ProgBar(len(self.train_triggers+self.test_triggers))
 
         all_pos_tags = truth.extractdatafromfile(truth.EACH_UNIQUE_POS_FILE) # We only want to import this file once.
         for trigger in self.train_triggers + self.test_triggers:
-            for ant in trigger.possible_ants:
-                ant.x = avc.build_feature_vector(ant, trigger, self.sentences, all_pos_tags)
-                if self.num_features == 0:
-                    self.num_features = len(ant.x)
-                if len(ant.x) != self.num_features:
-                    raise Exception("DIFFERENT NUMBER OF FEATURES FOR DIFFERENT ANTECEDENTS!")
-                if verbose:
-                    bar.update()
-            trigger.gold_ant.x = avc.build_feature_vector(ant, trigger, self.sentences, all_pos_tags)
+
+            alignment_matrix(self.sentences, trigger, dep_names=('prep','nsubj','dobj','nmod','adv','conj'), pos_tags=all_pos_tags)
+
+            if verbose:
+                bar.update()
+            # for ant in trigger.possible_ants:
+            #     ant.x = avc.build_feature_vector(ant, trigger, self.sentences, all_pos_tags)
+            #
+            #     if self.num_features == 0:
+            #         self.num_features = len(ant.x)
+            #
+            #     if len(ant.x) != self.num_features:
+            #         raise Exception("DIFFERENT NUMBER OF FEATURES FOR DIFFERENT ANTECEDENTS!")
+            #
+            #     if verbose:
+            #         bar.update()
+            # trigger.gold_ant.x = avc.build_feature_vector(ant, trigger, self.sentences, all_pos_tags)
         return
 
     # noinspection PyArgumentList
     def initialize_weights(self, seed=1917):
         np.random.seed(seed)
+        # self.W_old = np.ones(len(self.train_triggers[0].possible_ants[0].x))
         self.W_old = (np.random.rand(len(self.train_triggers[0].possible_ants[0].x)))
+        self.W_avg = copy(self.W_old)
 
     def debug_ant_selection(self, verbose=False, write_to_file=None):
         missed = 0
@@ -190,20 +210,34 @@ class AntecedentClassifier:
             f.close()
 
     def fit(self, epochs=5, verbose=True, k=5, features_to_analyze=5):
+        # ws = [copy(self.W_old)]
         i=0
         for n in range(epochs):
             for trigger in shuffle(self.train_triggers):
                 bestk = self.bestk_ants(trigger, self.W_old, k=k)
                 self.analyze(self.W_old, features_to_analyze)
+
                 self.W_old = update_weights(self.W_old, bestk, trigger.gold_ant, self.loss_function, C=self.C)
-                self.W_avg = (1.0-(1.0/(i+1))) * self.W_avg + (1.0/(i+1)) * self.W_old
+                # ws.append(copy(self.W_old))
+                # self.W_avg = np.mean(ws[1:],axis=0)
+
+                self.W_old = update_weights(self.W_old, bestk, trigger.gold_ant, self.loss_function, C=self.C)
+                self.W_avg = (1.0-(1.0/(i+1))) * self.W_avg + (1.0/(i+1)) * self.W_old # Running average.
                 i+=1
             if verbose and n>0:
                 self.accs.append(self.accuracy(self.predict()))
-                print 'Epoch %d - error: %0.2f'%(n, self.accs[-1])
+                print '\nEpoch %d - error: %0.2f'%(n, self.accs[-1])
+                print self.sentences.get_sentence(self.train_triggers[0].sentnum)
+                print 'best_ant:',self.bestk_ants(trigger, self.W_avg, k=1)[0]
 
                 self.diffs.append(np.mean((self.W_avg-self.W_old)**2))
                 print 'Difference btwen avg vector w_old: %0.3f'%(self.diffs[-1])
+
+    def predict(self):
+        predictions = []
+        for trigger in self.test_triggers:
+            predictions.append(self.bestk_ants(trigger, self.W_avg, k=1)[0])
+        return predictions
 
     def loss_function(self, gold_ant, proposed_ant):
         """
@@ -221,12 +255,6 @@ class AntecedentClassifier:
             return 1.0 - (2.0*precision*recall)/(precision+recall)
         except ZeroDivisionError:
             return 1.0
-
-    def predict(self):
-        predictions = []
-        for trigger in self.test_triggers:
-            predictions.append(self.bestk_ants(trigger, self.W_avg, k=1)[0])
-        return predictions
 
     def accuracy(self, predictions):
         losses = []
@@ -280,26 +308,26 @@ class AntecedentClassifier:
         plt.show()
 
 if __name__ == '__main__':
-    a = AntecedentClassifier(0,0,0,0)
-    a.import_data()
+    a = AntecedentClassifier(0,0,0,0, C=0.03)
     print 'We missed %d vpe instances.'%a.missed_vpe
-    for trig in a.train_triggers:
-        print '--------------------------------------------'
-        print 'TRIGGER',trig
-        print a.sentences.get_sentence(trig.sentnum)
-        # print a.sentences.get_sentence(trig.sentnum).dependencies
-        print 'ANTECEDENT:',trig.gold_ant
-        print a.sentences.get_sentence(trig.gold_ant.sentnum)
-    print '---------'
+    # for trig in a.train_triggers:
+    #     print '--------------------------------------------'
+    #     print 'TRIGGER',trig
+    #     print a.sentences.get_sentence(trig.sentnum)
+    #     # print a.sentences.get_sentence(trig.sentnum).dependencies
+    #     print 'ANTECEDENT:',trig.gold_ant
+    #     print a.sentences.get_sentence(trig.gold_ant.sentnum)
+    # print '---------'
 
-    s = a.sentences.get_sentence(1)
-    chunks = s.chunked_dependencies(0,len(s)-1)
-    print chunks
+    pos_tests = ['VP','ADJ-PRD','NP-PRD', wc.is_adjective, wc.is_verb]
+    a.initialize(pos_tests, sd=5, test=True)
+    a.debug_ant_selection(verbose=True)
+    # s = a.sentences.get_sentence(1)
+    # chunks = s.chunked_dependencies(0,len(s)-1)
+    # am = alignment_matrix(a.sentences, a.train_triggers[0], dep_names=('prep','nsubj','dobj','nmod','adv','conj'))
 
     # # Using functional programming here because it's nice
-    # pos_tests = ['VP','ADJ-PRD','NP-PRD', wc.is_adjective, wc.is_verb]
-    # a.initialize(pos_tests, sd=5)
     #
-    # a.fit(epochs=500, k=10, verbose=True)
+    a.fit(epochs=500, k=5, verbose=True)
     # a.make_graphs()
 

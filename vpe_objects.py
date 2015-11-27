@@ -98,7 +98,10 @@ class AllSentences:
 
     def idxs_to_ant(self, sentnum, start, end, trigger):
         sentdict = self.sentences[sentnum]
-        return Antecedent(start, trigger, SubSentDict(sentdict.words[start:end], sentdict.pos[start:end], sentdict.lemmas[start:end]))
+        return Antecedent(sentnum, trigger, SubSentDict(sentdict.words[start:end],
+                                                        sentdict.pos[start:end],
+                                                        sentdict.lemmas[start:end]),
+                          start, end-1)
 
     def get_sentence_tree(self, i):
         return nt.maketree(self.sentences[i]['tree'][0])
