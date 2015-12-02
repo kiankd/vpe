@@ -190,5 +190,4 @@ def find_word_sequence(words, targets):
                 break
         else:
             count = 0
-
     return start,end

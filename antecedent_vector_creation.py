@@ -35,7 +35,13 @@ def ant_trigger_relationship(ant, trigger, sentences, all_tags):
     trig_np = numpy.array(nearest_trig_np(trigger, sentences, all_tags))
 
     v += list(abs(ant_np - trig_np))
-    v.append(numpy.dot(ant_np, trig_np) / (numpy.linalg.norm(ant_np) * numpy.linalg.norm(trig_np)))
+
+    if not ant_np.any() or not trig_np.any():
+        val = 0.0
+    else:
+        val = numpy.dot(ant_np, trig_np) / (numpy.linalg.norm(ant_np) * numpy.linalg.norm(trig_np))
+
+    v.append(val)
     return v
 
 def nearest_trig_np(trig, sentences, all_tags):
