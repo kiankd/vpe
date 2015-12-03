@@ -16,11 +16,14 @@ class Files:
         XML_RAW_TOKENIZED = XML_ANNOTATIONS_DIR+'tokenized_raw/'
         VPE_ANNOTATIONS = FULL_PROJECT_DIR+'vpe_annotations/wsj/'
 
+        IMPORTED_DATA = FULL_PROJECT_DIR + 'npy_data/imported_data.npy'
+
         LOG_LOCATIONS = FULL_PROJECT_DIR+'project/logs/'
 
         SLASH_CHAR = '/'
         DROP_BOX_DIR = '/Users/kian/Dropbox/'
         RESULT_LOGS_LOCATION = DROP_BOX_DIR + 'project/result_logs/'
+
     else:
         FULL_PROJECT_DIR = 'C:\\Users\\Kian\\Sura\\'
 

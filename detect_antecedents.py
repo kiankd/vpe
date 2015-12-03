@@ -3,6 +3,7 @@ import numpy as np
 import word_characteristics as wc
 import antecedent_vector_creation as avc
 import truth
+import time
 from heapq import nlargest
 from os import listdir
 from pyprind import ProgBar
@@ -17,20 +18,25 @@ def shuffle(list_):
     return list_
 
 class AntecedentClassifier:
-    def __init__(self, train_start, train_end, test_start, test_end, learn_rate=1.0, C=1.0):
+    def __init__(self, train_start, train_end, val_start, val_end, test_start, test_end, learn_rate=lambda x: 1.0/(x+1), C=1.0):
         self.sentences = vpe.AllSentences()
         self.annotations = vpe.Annotations()
         self.file_names = vpe.Files()
 
         self.train_ants = []
+        self.val_ants = []
         self.test_ants = []
         self.train_triggers = []
+        self.val_triggers = []
         self.test_triggers = []
 
         self.start_train = train_start
         self.end_train = train_end
+        self.start_val = val_start
+        self.end_val = val_end
         self.start_test = test_start
         self.end_test = test_end
+
         self.W_avg = None
         self.W_old = None
         self.learn_rate = learn_rate
@@ -43,16 +49,23 @@ class AntecedentClassifier:
         self.feature_vals = []
         self.feature_names = []
         self.random_features = []
-        self.accs = []
+        self.train_err = []
+        self.val_err = []
+        self.test_err = []
         self.diffs = []
 
-    def initialize(self, pos_tests, W=None, sd=99, test=0, delete_random=0.0):
-        self.import_data()
-        print 'Generating possible antecedents...'
-        self.generate_possible_ants(pos_tests, sd, test=test, delete_random=delete_random)
-        self.build_feature_vectors(verbose=True)
-        self.normalize()
-        print 'Building feature vectors...'
+    def initialize(self, pos_tests, W=None, sd=99, test=0, delete_random=0.0, save=False, load=False):
+        if not load:
+            self.import_data()
+            self.generate_possible_ants(pos_tests, sd, test=test, delete_random=delete_random)
+            self.build_feature_vectors(verbose=True)
+            self.normalize()
+        else:
+            self.load_imported_data()
+
+        if save:
+            self.save_imported_data()
+
         self.initialize_weights(initial=W)
 
     def import_data(self, test=None):
@@ -65,7 +78,11 @@ class AntecedentClassifier:
         for d in dirs:
             subdir = d+self.file_names.SLASH_CHAR
             if subdir.startswith('.'): continue
-            if (self.start_train <= dnum <= self.end_train) or (self.start_test <= dnum <= self.end_test):
+
+            if (self.start_train <= dnum <= self.end_train) or \
+               (self.start_test <= dnum <= self.end_test) or \
+               (self.start_val <= dnum <= self.end_val):
+
                 section_annotation = vpe.AnnotationSection(subdir, self.file_names.VPE_ANNOTATIONS)
 
                 vpe_files = list(set([annotation.file for annotation in section_annotation]))
@@ -88,6 +105,10 @@ class AntecedentClassifier:
                                 self.train_ants += mrg_matrix.get_gs_antecedents(section_annotation.get_anns_for_file(f), section_triggers, sentnum_modifier)
                                 self.train_triggers += section_triggers
 
+                            if self.start_val <= dnum <= self.end_val:
+                                self.val_ants += mrg_matrix.get_gs_antecedents(section_annotation.get_anns_for_file(f), section_triggers, sentnum_modifier)
+                                self.val_triggers += section_triggers
+
                             if self.start_test <= dnum <= self.end_test:
                                 self.test_ants += mrg_matrix.get_gs_antecedents(section_annotation.get_anns_for_file(f), section_triggers, sentnum_modifier)
                                 self.test_triggers += section_triggers
@@ -108,15 +129,16 @@ class AntecedentClassifier:
 
     def generate_possible_ants(self, pos_tests, sd=99, test=0, delete_random=0.0):
         """Generate all candidate antecedents."""
+        print 'Generating possible antecedents...'
         if test: # ONLY FOR TESTING! THIS CHEATS!!
-            for trigger in self.train_triggers + self.test_triggers:
+            for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
                 trigger.possible_ants = []
                 self.sentences.set_possible_ants(trigger, pos_tests, search_distance=sd)
                 trigger.possible_ants = [trigger.gold_ant] + trigger.possible_ants[0:test]
             return
 
         # Fair testing.
-        for trigger in self.train_triggers + self.test_triggers:
+        for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
             trigger.possible_ants = []
 
             self.sentences.set_possible_ants(trigger, pos_tests, search_distance=sd)
@@ -135,30 +157,18 @@ class AntecedentClassifier:
         return nlargest(k, trigger.possible_ants, key=vpe.Antecedent.get_score)
 
     def build_feature_vectors(self, verbose=True):
+        print 'Building feature vectors...'
         """Build each feature vector for each possible antecedent and each gold antecedent - takes time."""
         if verbose:
             # bar = ProgBar(len(self.train_triggers+self.test_triggers)*len(self.train_triggers[0].possible_ants))
-            bar = ProgBar(len(self.train_triggers+self.test_triggers))
+            bar = ProgBar(len(self.train_triggers)+len(self.val_triggers)+len(self.test_triggers))
 
         all_pos_tags = truth.extractdatafromfile(truth.EACH_UNIQUE_POS_FILE) # We only want to import this file once.
-        for trigger in self.train_triggers + self.test_triggers:
+        for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
 
             alignment_matrix(self.sentences, trigger, dep_names=('prep','nsubj','dobj','nmod','adv','conj'), pos_tags=all_pos_tags)
-
             if verbose:
                 bar.update()
-            # for ant in trigger.possible_ants:
-            #     ant.x = avc.build_feature_vector(ant, trigger, self.sentences, all_pos_tags)
-            #
-            #     if self.num_features == 0:
-            #         self.num_features = len(ant.x)
-            #
-            #     if len(ant.x) != self.num_features:
-            #         raise Exception("DIFFERENT NUMBER OF FEATURES FOR DIFFERENT ANTECEDENTS!")
-            #
-            #     if verbose:
-            #         bar.update()
-            # trigger.gold_ant.x = avc.build_feature_vector(ant, trigger, self.sentences, all_pos_tags)
         return
 
     def initialize_weights(self, initial=None, seed=1917):
@@ -223,32 +233,41 @@ class AntecedentClassifier:
 
     def normalize(self):
         print 'Normalizing the data...'
-        xtrain,xtest = [],[]
+        xtrain,xval,xtest = [],[],[]
+
         for trig in self.train_triggers:
             for ant in trig.possible_ants:
                 xtrain.append(ant.x)
             xtrain.append(trig.gold_ant.x)
+
+        for trig in self.val_triggers:
+            for ant in trig.possible_ants:
+                xval.append(ant.x)
+            xval.append(trig.gold_ant.x)
 
         for trig in self.test_triggers:
             for ant in trig.possible_ants:
                 xtest.append(ant.x)
             xtest.append(trig.gold_ant.x)
 
-        X = np.array(xtrain + xtest)
+        X = np.array(xtrain + xval + xtest)
         X = X[:, (X == 0).sum(axis=0) <= len(X)-1] # Remove 0 columns
 
         xtrain = np.array(X[:len(xtrain)])
-        xtest = np.array(X[len(xtrain):])
+        xval = np.array(X[len(xtrain):len(xtrain)+len(xval)])
+        xtest = np.array(X[len(xtrain)+len(xval):])
 
         mean = xtrain.mean(axis=0)
         xtrain -= mean
+        xval -= mean
         xtest -= mean
 
         stdtrain = xtrain.std(axis=0)[1:]
-        for val in [np.NAN, np.inf, 0.0]:
-            stdtrain[stdtrain == val] = 1.0
+        for v in [np.NAN, np.inf, 0.0]:
+            stdtrain[stdtrain == v] = 1.0
 
         xtrain[:,1:] /= stdtrain # Standard deviation of bias is zero, dont divide it.
+        xval[:,1:] /= stdtrain
         xtest[:,1:] /= stdtrain
 
         i=0
@@ -257,6 +276,13 @@ class AntecedentClassifier:
                 ant.x = xtrain[i]
                 i += 1
             trig.gold_ant.x = xtrain[i].flatten()
+            i += 1
+        i=0
+        for trig in self.val_triggers:
+            for ant in trig.possible_ants:
+                ant.x = xval[i]
+                i += 1
+            trig.gold_ant.x = xval[i].flatten()
             i += 1
         i=0
         for trig in self.test_triggers:
@@ -280,20 +306,25 @@ class AntecedentClassifier:
                 # self.W_avg = np.mean(ws[1:],axis=0)
 
                 self.W_old = update_weights(self.W_old, bestk, trigger.gold_ant, self.loss_function, C=self.C)
-                self.W_avg = (1.0-(1.0/(i+1))) * self.W_avg + (1.0/(i+1)) * self.W_old # Running average.
+                self.W_avg = (1.0-self.learn_rate(i)) * self.W_avg + self.learn_rate(i) * self.W_old # Running average.
                 i+=1
 
             if verbose and n>0:
-                self.accs.append(self.accuracy(self.predict()))
-                print '\nEpoch %d - error: %0.2f'%(n, self.accs[-1])
+                self.train_err.append(self.accuracy(self.predict(self.train_triggers)))
+                self.val_err.append(self.accuracy(self.predict(self.val_triggers)))
+                self.test_err.append(self.accuracy(self.predict(self.test_triggers)))
+
+                print '\nEpoch %d - train/val/test error: %0.2f, %0.2f, %0.2f'\
+                      %(n, self.train_err[-1],self.val_err[-1],self.test_err[-1])
+
                 print self.sentences.get_sentence(trigger.sentnum)
                 print 'best_ant:',self.bestk_ants(trigger, self.W_avg, k=1)[0]
                 self.diffs.append(np.mean((self.W_avg-self.W_old)**2))
                 print 'Difference btwen avg vector w_old: %0.3f'%(self.diffs[-1])
 
-    def predict(self):
+    def predict(self, trigger_list):
         predictions = []
-        for trigger in self.test_triggers:
+        for trigger in trigger_list:
             predictions.append(self.bestk_ants(trigger, self.W_avg, k=1)[0])
         return predictions
 
@@ -302,6 +333,10 @@ class AntecedentClassifier:
         @type gold_ant: vpe.Antecedent
         @type proposed_ant: vpe.Antecedent
         """
+        # I think this should be slightly modified:
+        # weigh the "head" - the first word of the gold_ant
+        # more than the rest of the words.
+
         gold_vals = gold_ant.word_pos_tuples()
         proposed_vals = proposed_ant.word_pos_tuples()
         tp = float(len([tup for tup in proposed_vals if tup in gold_vals]))
@@ -315,10 +350,10 @@ class AntecedentClassifier:
             return 1.0
 
     def accuracy(self, predictions):
-        losses = []
+        errors = []
         for ant in predictions:
-            losses.append(self.loss_function(ant.trigger.gold_ant, ant))
-        return float(np.mean(losses, dtype=np.float64))
+            errors.append(self.loss_function(ant.trigger.gold_ant, ant))
+        return float(np.mean(errors, dtype=np.float64))
 
     def analyze(self, w, num_features):
         self.norms.append(np.linalg.norm(w))
@@ -341,7 +376,7 @@ class AntecedentClassifier:
 
         plt.figure(1)
         plt.title('Weight Vector 2-Norm Change')
-        plt.plot(range(len(self.norms)), self.norms, 'bo')
+        plt.plot(range(len(self.norms)), self.norms, 'b-')
         plt.savefig(params+'norm_change1.png', bbox_inches='tight')
         # plt.show()
 
@@ -357,11 +392,17 @@ class AntecedentClassifier:
         plt.savefig(params+'feature_value_change1.png', bbox_inches='tight')
         # plt.show()
 
-        plt.figure(3)
-        plt.title('Accuracy Change')
-        plt.plot(range(len(self.accs)), self.accs, 'bo')
-        plt.savefig(params+'accuracy_change1.png', bbox_inches='tight')
-        # plt.show()
+        err_fig = plt.figure(3)
+        ax = plt.subplot(111)
+        plt.title('Train/Val/Test Error over time')
+        ax.plot(range(len(self.train_err)), self.train_err, 'b-', label='Train')
+        ax.plot(range(len(self.val_err)), self.val_err, 'y-', label='Validation')
+        ax.plot(range(len(self.test_err)), self.test_err, 'r-', label='Test')
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        plt.savefig(params+'errors.png', bbox_inches='tight')
+
 
         plt.figure(4)
         plt.title('Squared Weight Vector Change')
@@ -369,8 +410,22 @@ class AntecedentClassifier:
         plt.savefig(params+'weight_vector_change1.png', bbox_inches='tight')
         # plt.show()
 
+    def save_imported_data(self, name=''):
+        print 'Saving the data...'
+        np.save(self.file_names.IMPORTED_DATA+name, np.array([self.sentences, self.train_triggers, self.val_triggers, self.test_triggers]))
+
+    def load_imported_data(self, name=''):
+        print 'Loading the data...'
+        folder = self.file_names.IMPORTED_DATA+name
+        data = np.load(self.file_names.IMPORTED_DATA)
+        self.sentences = data[0]
+        self.train_triggers = data[1]
+        self.val_triggers = data[2]
+        self.test_triggers = data[3]
+
 if __name__ == '__main__':
-    a = AntecedentClassifier(0,0,0,0, C=0.005)
+    start_time = time.clock()
+    a = AntecedentClassifier(0,14, 15,19, 20,24, C=0.001, learn_rate=lambda x: 0.5)
     print 'We missed %d vpe instances.'%a.missed_vpe
     # for trig in a.train_triggers:
     #     print '--------------------------------------------'
@@ -383,10 +438,14 @@ if __name__ == '__main__':
 
     pos_tests = ['VP','ADJ-PRD','NP-PRD', wc.is_adjective, wc.is_verb]
     initial_weights = None #np.load('50epoch25k005c_weights.npy')
-    a.initialize(pos_tests, W=initial_weights, sd=5, test=0, delete_random=0)
-    K = 25
-    a.fit(epochs=150, k=K, verbose=True)
-    a.make_graphs(K, '')
+
+    a.initialize(pos_tests, W=initial_weights, sd=5, test=0, delete_random=0, save=False, load=True)
+
+    K = 5
+    a.fit(epochs=100, k=K, verbose=True)
+    a.make_graphs(K, 'full_dataset_lr05')
     # print a.W_avg
 
     # Get train and validation error and test error for entire dataset.
+
+    print 'Time taken: %0.2f'%(time.clock() - start_time)
