@@ -13,6 +13,9 @@ from matplotlib import pyplot as plt
 from alignment import alignment_matrix
 from copy import copy
 
+from subprocess import call
+call('clear')
+
 def shuffle(list_):
     np.random.shuffle(list_)
     return list_
@@ -54,19 +57,31 @@ class AntecedentClassifier:
         self.test_err = []
         self.diffs = []
 
-    def initialize(self, pos_tests, W=None, sd=99, test=0, delete_random=0.0, save=False, load=False):
+    def initialize(self, pos_tests, seed=1917, W=None, sd=99, test=0, delete_random=0.0, save=False, load=False, update=False):
         if not load:
             self.import_data()
             self.generate_possible_ants(pos_tests, sd, test=test, delete_random=delete_random)
-            self.build_feature_vectors(verbose=True)
+            self.build_feature_vectors()
             self.normalize()
         else:
             self.load_imported_data()
 
+            if update:
+                self.generate_possible_ants(pos_tests, sd)
+                self.build_feature_vectors()
+                self.normalize()
+            c=0
+            for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
+                for ant in trigger.possible_ants:
+                    if ant.contains_trigger():
+                        c+=1
+                        trigger.possible_ants.remove(ant)
+            print 'Deleted %d ants!'%c
+
         if save:
             self.save_imported_data()
 
-        self.initialize_weights(initial=W)
+        self.initialize_weights(initial=W, seed=seed)
 
     def import_data(self, test=None):
         """Import data from our XML directory and find all of the antecedents. Takes a bit of time."""
@@ -149,6 +164,15 @@ class AntecedentClassifier:
                 trigger.possible_ants = list(trigger.possible_ants[sample(range(size), int(size * delete_random))])
 
             trigger.possible_ants = list(trigger.possible_ants)
+
+        # Delete antecedents that contain the trigger in them:
+        c=0
+        for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
+            for ant in trigger.possible_ants:
+                if ant.contains_trigger():
+                    c+=1
+                    trigger.possible_ants.remove(ant)
+        print 'Deleted %d bad antecedents!'%c
 
     def bestk_ants(self, trigger, w, k=5):
         """Return the best k antecedents given the weight vector w with respect to the score attained."""
@@ -301,12 +325,11 @@ class AntecedentClassifier:
                 bestk = self.bestk_ants(trigger, self.W_old, k=k)
                 self.analyze(self.W_old, features_to_analyze)
 
-                self.W_old = update_weights(self.W_old, bestk, trigger.gold_ant, self.loss_function, C=self.C)
                 # ws.append(copy(self.W_old))
                 # self.W_avg = np.mean(ws[1:],axis=0)
 
                 self.W_old = update_weights(self.W_old, bestk, trigger.gold_ant, self.loss_function, C=self.C)
-                self.W_avg = (1.0-self.learn_rate(i)) * self.W_avg + self.learn_rate(i) * self.W_old # Running average.
+                self.W_avg = ((1.0-self.learn_rate(i)) * self.W_avg) + (self.learn_rate(i) * self.W_old) # Running average.
                 i+=1
 
             if verbose and n>0:
@@ -317,8 +340,13 @@ class AntecedentClassifier:
                 print '\nEpoch %d - train/val/test error: %0.2f, %0.2f, %0.2f'\
                       %(n, self.train_err[-1],self.val_err[-1],self.test_err[-1])
 
+                # print 'Trigger sentnum,wordnum: %d,%d'%(trigger.sentnum,trigger.wordnum)
                 print self.sentences.get_sentence(trigger.sentnum)
-                print 'best_ant:',self.bestk_ants(trigger, self.W_avg, k=1)[0]
+
+                best_ant = self.bestk_ants(trigger, self.W_avg, k=1)[0]
+                # print 'Best_ant sentnum = %d, start,end = %d,%d:'%(best_ant.sentnum,best_ant.start,best_ant.end),
+                print best_ant
+
                 self.diffs.append(np.mean((self.W_avg-self.W_old)**2))
                 print 'Difference btwen avg vector w_old: %0.3f'%(self.diffs[-1])
 
@@ -425,7 +453,7 @@ class AntecedentClassifier:
 
 if __name__ == '__main__':
     start_time = time.clock()
-    a = AntecedentClassifier(0,14, 15,19, 20,24, C=0.001, learn_rate=lambda x: 0.5)
+    a = AntecedentClassifier(0,14, 15,19, 20,24, C=1.0,learn_rate=lambda x: 0.001)
     print 'We missed %d vpe instances.'%a.missed_vpe
     # for trig in a.train_triggers:
     #     print '--------------------------------------------'
@@ -439,13 +467,24 @@ if __name__ == '__main__':
     pos_tests = ['VP','ADJ-PRD','NP-PRD', wc.is_adjective, wc.is_verb]
     initial_weights = None #np.load('50epoch25k005c_weights.npy')
 
-    a.initialize(pos_tests, W=initial_weights, sd=5, test=0, delete_random=0, save=False, load=True)
+    a.initialize(pos_tests, W=initial_weights, sd=5, test=0, delete_random=0, save=False, load=True, update=False, seed=1917)
 
     K = 5
-    a.fit(epochs=100, k=K, verbose=True)
-    a.make_graphs(K, 'full_dataset_lr05')
-    # print a.W_avg
-
-    # Get train and validation error and test error for entire dataset.
+    name = 'full_dataset_highc_lowlr'
+    try:
+        a.fit(epochs=100, k=K, verbose=True)
+        a.make_graphs(K, name)
+    except KeyboardInterrupt:
+        a.make_graphs(K, name)
+        print 'Time taken: %0.2f'%(time.clock() - start_time)
 
     print 'Time taken: %0.2f'%(time.clock() - start_time)
+
+"""
+1) Delete potential antecedents that contain the trigger in them!!!!! 
+2) Check alignments between gold alignment vs bad antecedent alignment.
+3) Think about adding semantic info to the features - word2vec.
+"""
+
+# We were getting good with c=0.1 and lr = 0.0001, k=5!!!
+
