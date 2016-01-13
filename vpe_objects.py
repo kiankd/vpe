@@ -15,7 +15,7 @@ SO     = ['so','same','likewise','opposite']
 
 AUX_LEMMAS = MODALS+BE+HAVE+DO+TO+SO
 ALL_CATEGORIES = [MODALS, BE, HAVE, DO, TO, SO]
-ALL_AUXILIARIES = Files().extract_data_from_file(Files.UNIQUE_AUXILIARIES_FILE)
+#ALL_AUXILIARIES = Files().extract_data_from_file(Files.UNIQUE_AUXILIARIES_FILE)
 
 """ ---- Exception classes. ---- """
 class AuxiliaryHasNoTypeException:
