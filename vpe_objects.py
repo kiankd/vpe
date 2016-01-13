@@ -578,6 +578,13 @@ class Antecedent:
             ret += w+' '
         return ret
 
+    def contains_trigger(self):
+        if self.sentnum != self.trigger.sentnum:
+            return False
+        # If the antecedent comes after the trigger, delete it.
+        if self.start >= self.trigger.wordnum or self.end >= self.trigger.wordnum:
+            return True
+
     def set_score(self, weights):
         self.score = dot(self.x, weights)
 

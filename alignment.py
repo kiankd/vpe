@@ -30,8 +30,8 @@ def alignment_matrix(sentences, trigger, dep_names=('prep','adv','dobj','nsubj',
         remove_idxs(ant_chunks, ant.start, ant.end)
 
         ant.x = np.array([1] + alignment_vector(trig_chunks, ant_chunks, dep_names)
-                         + relational_vector(trigger, ant) + avc.ant_trigger_relationship(ant, trigger, sentences, pos_tags))
-        # print len(ant.x), ant.x
+                             + relational_vector(trigger, ant) 
+                             + avc.ant_trigger_relationship(ant, trigger, sentences, pos_tags))
     return
 
 def relational_vector(trig, ant):
@@ -42,11 +42,8 @@ def relational_vector(trig, ant):
     v = []
     v += [1.0 if trig.sentnum == ant.sentnum else 0.0]
     v += [trig.sentnum - ant.sentnum]
-    v += [ant.sentnum - trig.sentnum]
     v += [(trig.wordnum - ant.start)*(1+trig.sentnum - ant.sentnum)]
     v += [(trig.wordnum - ant.end)*(1+trig.sentnum - ant.sentnum)]
-    v += [(ant.start - trig.wordnum)*(1+trig.sentnum - ant.sentnum)]
-    v += [(ant.end - trig.wordnum)*(1+trig.sentnum - ant.sentnum)]
 
     return v
 

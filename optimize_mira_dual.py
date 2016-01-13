@@ -28,6 +28,7 @@ def update_weights(old, best, gold, L, C=1.0):
     primal_constraints = len(best)
 
     m = Model("qp")
+    m.params.OutputFlag = 0
 
     # Create the vector of alphas we want to solve for
     alpha = []
@@ -53,8 +54,8 @@ def update_weights(old, best, gold, L, C=1.0):
     m.setObjective(obj, GRB.MAXIMIZE)
     m.addConstr(quicksum(alpha) <= C, "c1") # Very simple constraint based on learning rate.
 
-    with Capturing() as output:
-        m.optimize()
+    # with Capturing() as output:
+    m.optimize()    
 
     # Weight update step:
     return old + np.sum(alpha[k].x * diffs[k] for k in range(primal_constraints))
