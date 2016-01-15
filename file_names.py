@@ -23,7 +23,13 @@ class Files:
         SLASH_CHAR = '/'
         DROP_BOX_DIR = '/Users/kian/Dropbox/'
         RESULT_LOGS_LOCATION = DROP_BOX_DIR + 'project/result_logs/'
+   
+    elif platform == 'linux2':
+        FULL_PROJECT_DIR = '/home/2014/kkenyo1/vpe_project/'
 
+        IMPORTED_DATA = FULL_PROJECT_DIR + 'npy_data/imported_data.npy'      
+
+        SLASH_CHAR = '/'
     else:
         FULL_PROJECT_DIR = 'C:\\Users\\Kian\\Sura\\'
 
