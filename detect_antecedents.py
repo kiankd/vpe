@@ -345,7 +345,8 @@ class AntecedentClassifier:
 
                 best_ant = self.bestk_ants(trigger, self.W_avg, k=1)[0]
                 # print 'Best_ant sentnum = %d, start,end = %d,%d:'%(best_ant.sentnum,best_ant.start,best_ant.end),
-                print best_ant
+                print 'Best ant: start %d, end %d, trigger wordnum %d.'%(best_ant.start, best_ant.end, best_ant.trigger.wordnum)
+                print 'Best ant:', best_ant
 
                 self.diffs.append(np.mean((self.W_avg-self.W_old)**2))
                 print 'Difference btwen avg vector w_old: %0.3f'%(self.diffs[-1])
@@ -453,7 +454,7 @@ class AntecedentClassifier:
 
 if __name__ == '__main__':
     start_time = time.clock()
-    a = AntecedentClassifier(0,14, 15,19, 20,24, C=1.0,learn_rate=lambda x: 0.001)
+    a = AntecedentClassifier(0,14, 15,19, 20,24, C=0.075, learn_rate=lambda x: 0.0001)
     print 'We missed %d vpe instances.'%a.missed_vpe
     # for trig in a.train_triggers:
     #     print '--------------------------------------------'
@@ -467,18 +468,21 @@ if __name__ == '__main__':
     pos_tests = ['VP','ADJ-PRD','NP-PRD', wc.is_adjective, wc.is_verb]
     initial_weights = None #np.load('50epoch25k005c_weights.npy')
 
-    a.initialize(pos_tests, W=initial_weights, sd=5, test=0, delete_random=0, save=False, load=True, update=False, seed=1917)
+    a.initialize(pos_tests, W=initial_weights, sd=5, test=0, delete_random=0,
+                 save=False, load=True, update=False, seed=2384834)
 
     K = 5
-    name = 'full_dataset_highc_lowlr'
+    name = 'full_dataset_c075_l0001_k5'
+
     try:
-        a.fit(epochs=100, k=K, verbose=True)
+        a.fit(epochs=500, k=K, verbose=True)
         a.make_graphs(K, name)
     except KeyboardInterrupt:
         a.make_graphs(K, name)
         print 'Time taken: %0.2f'%(time.clock() - start_time)
 
     print 'Time taken: %0.2f'%(time.clock() - start_time)
+    np.save('weights_c075_l0001_k5', np.array(a.W_avg))
 
 """
 1) Delete potential antecedents that contain the trigger in them!!!!! 

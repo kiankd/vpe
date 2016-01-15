@@ -12,9 +12,9 @@ import antecedent_vector_creation as avc
 
 def alignment_matrix(sentences, trigger, dep_names=('prep','adv','dobj','nsubj','nmod'), pos_tags=None):
     """
-    Creates an alignment vector between the trigger and each of its potential antecedents.
-    @type sentences: vpe_objects.AllSentences
-    @type trigger: vpe_objects.Auxiliary
+        Creates an alignment vector between the trigger and each of its potential antecedents.
+        @type sentences: vpe_objects.AllSentences
+        @type trigger: vpe_objects.Auxiliary
     """
     trig_sentdict = sentences.get_sentence(trigger.sentnum)
     i,j = nearest_clause(trig_sentdict, trigger.wordnum-1) # WE NEED TO SUBTRACT BY ONE BECAUSE NO ROOT IN TREES
