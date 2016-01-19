@@ -29,6 +29,9 @@ def alignment_matrix(sentences, trigger, dep_names=('prep','adv','dobj','nsubj',
         ant_chunks = ant_sentdict.chunked_dependencies(k, l, dep_names=dep_names)
         remove_idxs(ant_chunks, ant.start, ant.end)
 
+        print trigger
+        print ant,'%d - (%d,%d)\n'%(ant.sentnum,ant.start,ant.end)
+
         ant.x = np.array([1] + alignment_vector(trig_chunks, ant_chunks, dep_names)
                              + relational_vector(trigger, ant) 
                              + avc.ant_trigger_relationship(ant, trigger, sentences, pos_tags))
@@ -112,6 +115,12 @@ def alignment_vector(t_chunks, a_chunks, dep_names, threshold=0.25, one_hot_leng
         v += [min(scores), max(scores)]
     else:
         v += [0.0, 0.0, 0.0, 0.0]
+
+    print t_chunks
+    print a_chunks
+    print mapping
+    print v
+    print '-----------------------'
 
     return v
 

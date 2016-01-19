@@ -4,6 +4,7 @@ import word_characteristics as wc
 import antecedent_vector_creation as avc
 import truth
 import time
+import sys
 from heapq import nlargest
 from os import listdir
 from pyprind import ProgBar
@@ -113,19 +114,20 @@ class AntecedentClassifier:
                             # mrg_matrix = XMLMatrix(f+'.pos.xml', self.file_names.XML_POS, pos_file=True)
 
                         """ Note that I am using the gold standard triggers here. """
-                        section_triggers = mrg_matrix.get_gs_auxiliaries(section_annotation.get_anns_for_file(f), sentnum_modifier)
-                        # self.triggers.add_auxs(mrg_matrix.get_gs_auxiliaries(section_annotation.get_anns_for_file(f), sentnum_modifier))
+                        file_annotations = section_annotation.get_anns_for_file(f)
+                        section_triggers = mrg_matrix.get_gs_auxiliaries(file_annotations, sentnum_modifier)
+                        # self.triggers.add_auxs(mrg_matrix.get_gs_auxiliaries(file_annotations, sentnum_modifier))
                         try:
                             if self.start_train <= dnum <= self.end_train:
-                                self.train_ants += mrg_matrix.get_gs_antecedents(section_annotation.get_anns_for_file(f), section_triggers, sentnum_modifier)
+                                self.train_ants += mrg_matrix.get_gs_antecedents(file_annotations, section_triggers, sentnum_modifier)
                                 self.train_triggers += section_triggers
 
                             if self.start_val <= dnum <= self.end_val:
-                                self.val_ants += mrg_matrix.get_gs_antecedents(section_annotation.get_anns_for_file(f), section_triggers, sentnum_modifier)
+                                self.val_ants += mrg_matrix.get_gs_antecedents(file_annotations, section_triggers, sentnum_modifier)
                                 self.val_triggers += section_triggers
 
                             if self.start_test <= dnum <= self.end_test:
-                                self.test_ants += mrg_matrix.get_gs_antecedents(section_annotation.get_anns_for_file(f), section_triggers, sentnum_modifier)
+                                self.test_ants += mrg_matrix.get_gs_antecedents(file_annotations, section_triggers, sentnum_modifier)
                                 self.test_triggers += section_triggers
 
                         except AssertionError:
@@ -188,8 +190,8 @@ class AntecedentClassifier:
             bar = ProgBar(len(self.train_triggers)+len(self.val_triggers)+len(self.test_triggers))
 
         all_pos_tags = truth.extractdatafromfile(truth.EACH_UNIQUE_POS_FILE) # We only want to import this file once.
-        for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
 
+        for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
             alignment_matrix(self.sentences, trigger, dep_names=('prep','nsubj','dobj','nmod','adv','conj'), pos_tags=all_pos_tags)
             if verbose:
                 bar.update()
@@ -366,11 +368,13 @@ class AntecedentClassifier:
         # weigh the "head" - the first word of the gold_ant
         # more than the rest of the words.
 
-        gold_vals = gold_ant.word_pos_tuples()
-        proposed_vals = proposed_ant.word_pos_tuples()
-        tp = float(len([tup for tup in proposed_vals if tup in gold_vals]))
-        fp = float(len([tup for tup in proposed_vals if not tup in gold_vals]))
-        fn = float(len([tup for tup in gold_vals if not tup in proposed_vals]))
+        gold_vals = gold_ant.get_words()
+        proposed_vals = proposed_ant.get_words()
+
+        tp = float(len([val for val in proposed_vals if val in gold_vals]))
+        fp = float(len([val for val in proposed_vals if not val in gold_vals]))
+        fn = float(len([val for val in gold_vals if not val in proposed_vals]))
+
         precision = tp/(tp+fp)
         recall = tp/(tp+fn)
         try:
@@ -453,9 +457,25 @@ class AntecedentClassifier:
         self.test_triggers = data[3]
 
 if __name__ == '__main__':
+    pos_tests = ['VP','ADJ-PRD','NP-PRD', wc.is_adjective, wc.is_verb]
+    debug = sys.argv[1] == 'debug'
+
     start_time = time.clock()
-    a = AntecedentClassifier(0,14, 15,19, 20,24, C=0.075, learn_rate=lambda x: 0.0001)
-    print 'We missed %d vpe instances.'%a.missed_vpe
+
+    if not debug:
+        a = AntecedentClassifier(0,14, 15,19, 20,24, C=0.075, learn_rate=lambda x: 0.0001)
+        print 'We missed %d vpe instances.'%a.missed_vpe
+        initial_weights = None #np.load('50epoch25k005c_weights.npy')
+
+        a.initialize(pos_tests, W=initial_weights, sd=5, test=0, delete_random=0,
+                 save=False, load=True, update=False, seed=2384834)
+    else:
+        a = AntecedentClassifier(0,0, 0,0, 0,0)
+        print 'Debugging...'
+        a.initialize(pos_tests, sd=5, save=False, load=False, update=False, seed=1917)
+
+        exit(0)
+
     # for trig in a.train_triggers:
     #     print '--------------------------------------------'
     #     print 'TRIGGER',trig
@@ -464,12 +484,6 @@ if __name__ == '__main__':
     #     print 'ANTECEDENT:',trig.gold_ant
     #     print a.sentences.get_sentence(trig.gold_ant.sentnum)
     # print '---------'
-
-    pos_tests = ['VP','ADJ-PRD','NP-PRD', wc.is_adjective, wc.is_verb]
-    initial_weights = None #np.load('50epoch25k005c_weights.npy')
-
-    a.initialize(pos_tests, W=initial_weights, sd=5, test=0, delete_random=0,
-                 save=False, load=True, update=False, seed=2384834)
 
     K = 5
     name = 'full_dataset_c075_l0001_k5'

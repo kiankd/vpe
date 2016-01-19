@@ -15,20 +15,25 @@ SO     = ['so','same','likewise','opposite']
 
 AUX_LEMMAS = MODALS+BE+HAVE+DO+TO+SO
 ALL_CATEGORIES = [MODALS, BE, HAVE, DO, TO, SO]
-#ALL_AUXILIARIES = Files().extract_data_from_file(Files.UNIQUE_AUXILIARIES_FILE)
+ALL_AUXILIARIES = Files().extract_data_from_file(Files.UNIQUE_AUXILIARIES_FILE)
 
 """ ---- Exception classes. ---- """
 class AuxiliaryHasNoTypeException:
     def __init__(self, aux_name):
         print 'The following auxiliary, %s, has no category!'%aux_name
+
 class EmptySentDictException:
     def __init__(self): pass
+
 class GoldStandardComesFromRawException:
     def __init__(self): pass
+
 class NoSubsequenceFoundException:
     def __init__(self): pass
+
 class Finished:
     def __init__(self): pass
+
 class WrongClassEquivalenceException:
     def __init__(self): pass
 
@@ -190,7 +195,7 @@ class XMLMatrix:
                         if not ann_num >= len(annotations):
                             crt_annotation = annotations[ann_num]
 
-                    if wc.is_auxiliary(s,i,AUX_LEMMAS,ALL_AUXILIARIES,raw=True):
+                    if wc.is_auxiliary(s, i, AUX_LEMMAS, ALL_AUXILIARIES, raw=True):
                         raw_all_auxiliaries.add_aux(RawAuxiliary(s.words[i], i, s.sentnum))
 
                 raw_matrix.append(s)
@@ -593,6 +598,9 @@ class Antecedent:
 
     def word_pos_tuples(self):
         return zip(self.sub_sentdict.pos, self.sub_sentdict.words)
+
+    def get_words(self):
+        return self.sub_sentdict.words
 
 class RawAntecedent:
     """ Only exists for extracting the annotations from the raw XML files. """
