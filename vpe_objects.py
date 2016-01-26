@@ -37,6 +37,22 @@ class Finished:
 class WrongClassEquivalenceException:
     def __init__(self): pass
 
+def ant_after_trigger(sentnum,i,j,trig):
+    if sentnum > trig.sentnum:
+        return True
+
+    if sentnum < trig.sentnum:
+        return False
+
+    if i <= trig.wordnum <= j: # trig is in the ant
+        return True
+
+    if i >= trig.wordnum: #ant follows the trig
+        return True
+
+    return False
+
+
 """ ---- Data importation classes. ---- """
 class AllSentences:
     """ A class that contains all of the StanfordCoreNLP sentences. """
@@ -74,38 +90,52 @@ class AllSentences:
                  if True in [f(tag) for f in functions]:
                      for j in range(i+1, min(i+search_distance,len(self.sentences[sentnum]))):
                                     # len(nt.get_nearest_phrase(nt.maketree(self.sentences[sentnum]['tree'][0]), i, [pos_tests]))):
-                         ant = self.idxs_to_ant(sentnum, i, j, trigger)
-                         if len(ant.sub_sentdict) > 0:
-                            trigger.add_possible_ant(ant)
+                        if not ant_after_trigger(sentnum,i,j,trigger):
+                            ant = self.idxs_to_ant(sentnum, i, j, trigger)
+                            if len(ant.sub_sentdict) > 0:
+                                trigger.add_possible_ant(ant)
 
             #Lets use the tree to decrease the number of dumb candidates.
+
             phrases = [p for p in pos_tests if type(p)==str]
             tree = nt.maketree(self.get_sentence(sentnum)['tree'][0])
             tree_pos = nt.getsmallestsubtrees(tree)
             tree_words = tree.leaves()
             leaves_dict = { (tree_pos[i].label(), tree_words[i]) : i+1 for i in range(len(tree_words))}
+
+            new_ants = []
             for pos in phrases:
                 for position in nt.phrase_positions_in_tree(tree, pos):
                     start = None
                     for w in nt.getsmallestsubtrees(tree[position]):
                         # print w.label(), w[0]
                         end = (w.label(), w[0])
+
                         if not start:
                             start = end
-                        if sentnum == trigger.sentnum and leaves_dict[end] == trigger.wordnum \
-                                or wc.is_punctuation(end[0]):
+
+                        if sentnum == trigger.sentnum and leaves_dict[end] == trigger.wordnum or wc.is_punctuation(end[0]):
                             break
+
                         ant = self.idxs_to_ant(sentnum, leaves_dict[start], leaves_dict[end]+1, trigger)
-                        if len(ant.sub_sentdict) > 0:
+
+                        if len(ant.sub_sentdict) > 0 and not ant_after_trigger(sentnum, start, end, trigger)\
+                            and not ((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger) in new_ants):
+
                             trigger.add_possible_ant(ant)
-                        # print 'added poss_ant: %d to %d'%(leaves_dict[start], leaves_dict[end]+1),trigger.possible_ants[-1]
+                            new_ants.append((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger))
+                            # print 'added poss_ant: %d to %d'%(leaves_dict[start], leaves_dict[end]+1),trigger.possible_ants[-1]
+
                     # raise Finished()
+
 
     def idxs_to_ant(self, sentnum, start, end, trigger):
         sentdict = self.sentences[sentnum]
-        return Antecedent(sentnum, trigger, SubSentDict(sentdict.words[start:end],
-                                                        sentdict.pos[start:end],
-                                                        sentdict.lemmas[start:end]),
+        return Antecedent(sentnum,
+                          trigger,
+                          SubSentDict(sentdict.words[start:end],
+                                      sentdict.pos[start:end],
+                                      sentdict.lemmas[start:end]),
                           start, end-1)
 
     def get_sentence_tree(self, i):
@@ -312,7 +342,8 @@ class SubSentDict:
 
     def __eq__(self, other):
         if type(self) is type(other):
-            return self.__dict__ == other.__dict__
+            return self.words == other.words and self.pos == other.pos and \
+                   self.start == other.start and self.end == other.end
         else:
             raise WrongClassEquivalenceException()
 
@@ -586,8 +617,10 @@ class Antecedent:
     def contains_trigger(self):
         if self.sentnum != self.trigger.sentnum:
             return False
+
         # If the antecedent comes after the trigger, delete it.
-        if self.start >= self.trigger.wordnum or self.end >= self.trigger.wordnum:
+        if self.start >= self.trigger.wordnum or \
+                (self.start <= self.trigger.wordnum <= self.end):
             return True
 
     def set_score(self, weights):

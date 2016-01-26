@@ -22,6 +22,12 @@ def alignment_matrix(sentences, trigger, dep_names=('prep','adv','dobj','nsubj',
     remove_idxs(trig_chunks, trigger.wordnum, trigger.wordnum)
 
     for ant in trigger.possible_ants + [trigger.gold_ant]:
+        print '\n---------------------MAPPING--------------------'
+        print 'SENTENCE:',trig_sentdict.words_to_string()
+        print trigger
+        print ant,'%d - (%d,%d)\n'%(ant.sentnum,ant.start,ant.end)
+
+
         ant_sentdict = sentences.get_sentence(ant.sentnum)
         # print ant_sentdict.words
         # print ant.sub_sentdict.words
@@ -29,12 +35,14 @@ def alignment_matrix(sentences, trigger, dep_names=('prep','adv','dobj','nsubj',
         ant_chunks = ant_sentdict.chunked_dependencies(k, l, dep_names=dep_names)
         remove_idxs(ant_chunks, ant.start, ant.end)
 
-        print trigger
-        print ant,'%d - (%d,%d)\n'%(ant.sentnum,ant.start,ant.end)
+        # print trigger
+        # print ant#,'%d - (%d,%d)\n'%(ant.sentnum,ant.start,ant.end)
 
-        ant.x = np.array([1] + alignment_vector(trig_chunks, ant_chunks, dep_names)
-                             + relational_vector(trigger, ant) 
-                             + avc.ant_trigger_relationship(ant, trigger, sentences, pos_tags))
+        ant.x = np.array([1] + alignment_vector(trig_chunks, ant_chunks, dep_names))
+                             # + relational_vector(trigger, ant)
+                             # + avc.ant_trigger_relationship(ant, trigger, sentences, pos_tags))
+    if 'industrial-production index' in trig_sentdict.words_to_string():
+        exit(0)
     return
 
 def relational_vector(trig, ant):
@@ -77,14 +85,16 @@ def alignment_vector(t_chunks, a_chunks, dep_names, threshold=0.25, one_hot_leng
             un_mapped_trigs.remove(tchunk)
             un_mapped_ants.remove(best_achunk)
             mapping.append((tchunk, best_achunk, best_score))
-            # print mapping
 
-    # print '\n---------------------MAPPING--------------------'
-    # print mapping
-    # print 'Null trig chunks:'
-    # print un_mapped_trigs
-    # print 'Null ant chunks:'
-    # print un_mapped_ants
+    print 'From this ant-chunks to this trig-chunks:'
+    print a_chunks
+    print t_chunks
+    print
+    print mapping
+    print 'Null trig chunks:'
+    print un_mapped_trigs
+    print 'Null ant chunks:'
+    print un_mapped_ants
 
     # Given that we have the mapping, make its feature vector:
     v = []
@@ -115,12 +125,12 @@ def alignment_vector(t_chunks, a_chunks, dep_names, threshold=0.25, one_hot_leng
         v += [min(scores), max(scores)]
     else:
         v += [0.0, 0.0, 0.0, 0.0]
-
-    print t_chunks
-    print a_chunks
-    print mapping
-    print v
-    print '-----------------------'
+    #
+    # print t_chunks
+    # print a_chunks
+    # print mapping
+    # print v
+    # print '-----------------------'
 
     return v
 
