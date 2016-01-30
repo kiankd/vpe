@@ -580,8 +580,8 @@ class AntecedentClassifier:
 
     # Make the feature vectors.
     def make_feature_vectors(self):
-        POS_TAGS = extractdatafromfile(EACH_UNIQUE_POS_FILE)
-        AUX_WORDS = extractdatafromfile(UNIQUE_AUXILIARIES_FILE)
+        POS_TAGS = extract_data_from_file(EACH_UNIQUE_POS_FILE)
+        AUX_WORDS = extract_data_from_file(UNIQUE_AUXILIARIES_FILE)
 
         patterns = []
         if self.get_bos_trigger_patterns:

@@ -1,5 +1,5 @@
 import numpy as np
-from truth import extractdatafromfile,EACH_UNIQUE_WORD_FILE,SVM_FILE_LOCATIONS,WORD2VEC_FILE
+from truth import extract_data_from_file,EACH_UNIQUE_WORD_FILE,SVM_FILE_LOCATIONS,WORD2VEC_FILE
 import time
 
 def load_bin_vec(fname, vocab, vocab_length):
@@ -44,7 +44,7 @@ def get_vectors(vocab):
 
 start = time.clock()
 print 'Getting vectors...'
-vocab = extractdatafromfile(EACH_UNIQUE_WORD_FILE)
+vocab = extract_data_from_file(EACH_UNIQUE_WORD_FILE)
 print 'Vocabulary size',len(vocab)
 dics = get_vectors(vocab)
 print 'Got vectors!'

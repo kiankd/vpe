@@ -113,9 +113,9 @@ def auxstruct(sentdict, auxidx, features):
     vector = []
 
     words,lemmas,postags = [],[],[]
-    if 'words' in features: words = extractdatafromfile(EACH_UNIQUE_WORD_NEAR_AUX)
+    if 'words' in features: words = extract_data_from_file(EACH_UNIQUE_WORD_NEAR_AUX)
     # if not specific or specific=='lemmas': lemmas = extractdatafromfile(EACH_UNIQUE_LEMMA_FILE)
-    if 'pos' in features: postags = extractdatafromfile(EACH_UNIQUE_POS_FILE)
+    if 'pos' in features: postags = extract_data_from_file(EACH_UNIQUE_POS_FILE)
 
     vector += makestructvector(sentdict, auxidx-3, words, lemmas, postags, features)
     vector += makestructvector(sentdict, auxidx-2, words, lemmas, postags, features)

@@ -175,8 +175,8 @@ class Classifier:
         auxnum = 0
 
         if from_file:
-            self.gold_standard_auxs.aux_bools = listtoints(extractdatafromfile(GOLD_STANDARD_FILE))
-            self.gold_standard_auxs.auxiliary_names = extractdatafromfile(UNIQUE_AUXILIARIES_FILE)
+            self.gold_standard_auxs.aux_bools = listtoints(extract_data_from_file(GOLD_STANDARD_FILE))
+            self.gold_standard_auxs.auxiliary_names = extract_data_from_file(UNIQUE_AUXILIARIES_FILE)
 
         dirs = listdir(XML_MRG)
         dirs.sort()
@@ -220,7 +220,7 @@ class Classifier:
 
     def getallauxiliaries(self):
         if not self.gold_standard_auxs.auxiliary_names:
-            self.gold_standard_auxs.auxiliary_names = extractdatafromfile(UNIQUE_AUXILIARIES_FILE)
+            self.gold_standard_auxs.auxiliary_names = extract_data_from_file(UNIQUE_AUXILIARIES_FILE)
         return self.gold_standard_auxs.auxiliary_names
 
     def getfeaturevectors(self, start_section, end_section):
@@ -293,7 +293,7 @@ class Classifier:
         # These just pinpoint the nature of the auxiliary it is passed.
         vector += vectorcreation.lemmacategoryvector(aux_lemma)
         vector += vectorcreation.lemmavector(aux_lemma)
-        vector += vectorcreation.auxwordvector(aux_word, extractdatafromfile(UNIQUE_AUXILIARIES_FILE))
+        vector += vectorcreation.auxwordvector(aux_word, extract_data_from_file(UNIQUE_AUXILIARIES_FILE))
 
         # This explains the surrounding structure of the auxiliary, three words ahead and in front.
         vector += vectorcreation.auxstruct(sentdict, auxidx, features)
@@ -488,7 +488,7 @@ def main():
         print 'Number of missed sentences %d'%classifier.gold_standard_auxs.missed_sentences
         print 'number of true positives in data: %d\n'%classifier.gold_standard_auxs.number_of_positive_auxs()
         # make_all_the_files(classifier, appearance_threshold=1000, option2=True)
-        print 'Length of each word near aux file:',len(extractdatafromfile(EACH_UNIQUE_WORD_NEAR_AUX))
+        print 'Length of each word near aux file:',len(extract_data_from_file(EACH_UNIQUE_WORD_NEAR_AUX))
 
     # aux_bools = classifier.gold_standard_auxs.aux_bools
     # for i in range(0, len(aux_bools)):

@@ -67,7 +67,7 @@ def untruth(i):
     if i==1: return True
     return False
 
-def extractdatafromfile(file_name):
+def extract_data_from_file(file_name):
     ret = []
     f = open(SVM_FILE_LOCATIONS+file_name, 'r')
     for line in f:

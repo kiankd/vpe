@@ -22,11 +22,10 @@ def alignment_matrix(sentences, trigger, dep_names=('prep','adv','dobj','nsubj',
     remove_idxs(trig_chunks, trigger.wordnum, trigger.wordnum)
 
     for ant in trigger.possible_ants + [trigger.gold_ant]:
-        print '\n---------------------MAPPING--------------------'
-        print 'SENTENCE:',trig_sentdict.words_to_string()
-        print trigger
-        print ant,'%d - (%d,%d)\n'%(ant.sentnum,ant.start,ant.end)
-
+        # print '\n---------------------MAPPING--------------------'
+        # print 'SENTENCE:',trig_sentdict.words_to_string()
+        # print trigger
+        # print ant,'%d - (%d,%d)\n'%(ant.sentnum,ant.start,ant.end)
 
         ant_sentdict = sentences.get_sentence(ant.sentnum)
         # print ant_sentdict.words
@@ -38,11 +37,11 @@ def alignment_matrix(sentences, trigger, dep_names=('prep','adv','dobj','nsubj',
         # print trigger
         # print ant#,'%d - (%d,%d)\n'%(ant.sentnum,ant.start,ant.end)
 
-        ant.x = np.array([1] + alignment_vector(trig_chunks, ant_chunks, dep_names))
+        ant.x = np.array([1] + alignment_vector(trig_chunks, ant_chunks, dep_names, verbose=True))
                              # + relational_vector(trigger, ant)
                              # + avc.ant_trigger_relationship(ant, trigger, sentences, pos_tags))
-    if 'industrial-production index' in trig_sentdict.words_to_string():
-        exit(0)
+    # if 'industrial-production index' in trig_sentdict.words_to_string():
+    #     exit(0)
     return
 
 def relational_vector(trig, ant):
@@ -58,7 +57,10 @@ def relational_vector(trig, ant):
 
     return v
 
-def alignment_vector(t_chunks, a_chunks, dep_names, threshold=0.25, one_hot_length=5):
+def word2vec_alignment_features(word2vec_dict, mapping):
+    return
+
+def alignment_vector(t_chunks, a_chunks, dep_names, threshold=0.25, one_hot_length=5, verbose=False):
     """
         This creates an alignment between the dependency chunks of a trigger and potential antecedent,
         then returns the feature vector representing that alignment.
@@ -86,15 +88,15 @@ def alignment_vector(t_chunks, a_chunks, dep_names, threshold=0.25, one_hot_leng
             un_mapped_ants.remove(best_achunk)
             mapping.append((tchunk, best_achunk, best_score))
 
-    print 'From this ant-chunks to this trig-chunks:'
-    print a_chunks
-    print t_chunks
-    print
-    print mapping
-    print 'Null trig chunks:'
-    print un_mapped_trigs
-    print 'Null ant chunks:'
-    print un_mapped_ants
+    # if verbose:
+    #     print '--------------\nFrom this ant-chunks to this trig-chunks:'
+    #     print a_chunks
+    #     print t_chunks
+    #     print "mapping:",mapping
+    #     print 'Null trig chunks:'
+    #     print un_mapped_trigs
+    #     print 'Null ant chunks:'
+    #     print un_mapped_ants
 
     # Given that we have the mapping, make its feature vector:
     v = []
@@ -117,6 +119,18 @@ def alignment_vector(t_chunks, a_chunks, dep_names, threshold=0.25, one_hot_leng
     mapped_ant_deps = [tup[1]['name'] for tup in mapping]
     v += [1.0 if dep_name in mapped_ant_deps else 0.0 for dep_name in dep_names]
     v += [1.0 if not 1.0 in v[-len(dep_names):] else 0.0]
+
+
+    # TODO: FRACTIONIZE THESE!!!!!
+    a = [len(tup[0]['sentdict'].words) for tup in mapping]
+    b = [len(tup[1]['sentdict'].words) for tup in mapping]
+    c = [len(chunk['sentdict'].words) for chunk in un_mapped_ants]
+    d = [len(chunk['sentdict'].words) for chunk in un_mapped_trigs]
+    for l in [a,b,c,d]:
+        if not l:
+            v += [ 1.0, 0.0, 0.0 ]
+        else:
+            v += [ 0.0, float(min(l))/max(l), np.mean(l)/max(l) ]
 
     # Now encode the mean and standard deviation of the scores, min and max of scores:
     scores = [tup[2] for tup in mapping]
@@ -169,10 +183,10 @@ def remove_idxs(chunks, start_idx, end_idx):
         for i in range(len(chunk['sentdict'])):
             # print i,i + chunk['sentdict'].start
             if i + chunk['sentdict'].start in indexes_to_remove:
-                if start_remove==None:
+                if start_remove == None:
                     start_remove = i
                 end_remove = i
-        if start_remove==None:
+        if start_remove == None:
             continue
         # print 'Removing:'
         # print chunk['sentdict'].words[start_remove: end_remove+1]
