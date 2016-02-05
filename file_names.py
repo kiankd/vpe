@@ -28,7 +28,7 @@ class Files:
         FULL_PROJECT_DIR = '/home/2014/kkenyo1/vpe_project/'
 
         IMPORTED_DATA = FULL_PROJECT_DIR + 'npy_data/imported_data.npy'      
-
+        DROP_BOX_DIR = FULL_PROJECT_DIR
         SLASH_CHAR = '/'
     else:
         FULL_PROJECT_DIR = 'C:\\Users\\Kian\\Sura\\'
@@ -54,6 +54,7 @@ class Files:
     WORD2VEC_FILE = 'word2vec_vectors_wsj_all_words.txt'
 
     WORD2VEC_LENGTH = 300
+
     def __init__(self):
         self.SVM_FILE_LOCATIONS = self.DROP_BOX_DIR+'project'+self.SLASH_CHAR+'svm_logs'+self.SLASH_CHAR
 
