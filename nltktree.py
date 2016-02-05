@@ -29,7 +29,7 @@ def find_subtree_phrases(t, phrases):
     return subtrees
 
 def get_nearest_clause(tree, start, end=None):
-    clauses = ['S', 'SBAR', 'SQ', 'SBARQ','SINV']
+    clauses = ['S', 'SBAR', 'SQ', 'SBARQ']
 
     if not end:
         subtree = getsmallestsubtrees(tree)[start]
@@ -184,9 +184,21 @@ def phrase_positions_in_tree(t, phrase):
 
     return subtree_vp_positions
 
+def get_phrase_length(t):
+    get_phrase_length.length = 0
+    def recurse(tree):
+        if type(tree) is nltk.ParentedTree:
+            for child in tree:
+                recurse(child)
+        else:
+            get_phrase_length.length += 1
+    recurse(t)
+    return get_phrase_length.length
+
 def get_nearest_phrase(t, idx, phrases):
     positions = getsmallestsubtreepositions(t)
-    try: crt_node = t[positions[idx-1]]
+    try:
+        crt_node = t[positions[idx-1]]
     except IndexError:
         print 'Fuck'
         return None
@@ -194,7 +206,7 @@ def get_nearest_phrase(t, idx, phrases):
     while not crt_node.label() in phrases:
 
         if crt_node.parent() == None:
-            return None
+            return crt_node
 
         crt_node = crt_node.parent()
 

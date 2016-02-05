@@ -1,8 +1,7 @@
 from sys import platform
 import word_characteristics as wc
 import operator
-# Just a small file for truth values if we ever decide to not use 1s and 0s.
-# Also stores globals. And other useful methods
+
 def number_of_words_surrounding_aux():
     return 1000
 

@@ -64,8 +64,11 @@ def is_noun(tag):
 def is_adverb(tag):
     return tag == 'RB'
 
+def is_determiner(tag):
+    return tag == 'DT'
+
 def is_punctuation(tag):
-    return tag in ['.',',','-','--','\'','\"']
+    return tag in ['.',',','-','--','\'','\"',':']
 
 """ My features. """
 def aux_ccommands_verb(sentdict, aux, tree, word_positions_in_tree):

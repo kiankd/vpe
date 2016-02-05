@@ -1,6 +1,7 @@
 import xml.etree.ElementTree as ET
 import nltktree as nt
 import word_characteristics as wc
+from operator import attrgetter
 from file_names import Files
 from os import listdir
 from truth import SENTENCE_SEARCH_DISTANCE
@@ -37,6 +38,22 @@ class Finished:
 class WrongClassEquivalenceException:
     def __init__(self): pass
 
+def ant_after_trigger(sentnum,i,j,trig):
+    if sentnum > trig.sentnum:
+        return True
+
+    if sentnum < trig.sentnum:
+        return False
+
+    if i <= trig.wordnum <= j: # trig is in the ant
+        return True
+
+    if i >= trig.wordnum: #ant follows the trig
+        return True
+
+    return False
+
+
 """ ---- Data importation classes. ---- """
 class AllSentences:
     """ A class that contains all of the StanfordCoreNLP sentences. """
@@ -62,50 +79,82 @@ class AllSentences:
 
     def set_possible_ants(self, trigger, pos_tests, search_distance=99):
         for sentnum in range(max(0, trigger.sentnum - SENTENCE_SEARCH_DISTANCE), trigger.sentnum+1):
-            #Every possible linear combination of words.
-            # for i in range(len(self.sentences[sentnum])):
-            #     for j in range(i+1, len(self.sentences[sentnum])):
-            #         trigger.add_possible_ant(self.idxs_to_ant(sentnum, i, j, trigger))
-
-            #Slightly more constrained but needs to be even more constrained.
             functions = [f for f in pos_tests if hasattr(f, '__call__')]
+
             for i in range(len(self.sentences[sentnum])):
                  tag = self.sentences[sentnum].pos[i]
-                 if True in [f(tag) for f in functions]:
-                     for j in range(i+1, min(i+search_distance,len(self.sentences[sentnum]))):
-                                    # len(nt.get_nearest_phrase(nt.maketree(self.sentences[sentnum]['tree'][0]), i, [pos_tests]))):
-                         ant = self.idxs_to_ant(sentnum, i, j, trigger)
-                         if len(ant.sub_sentdict) > 0:
-                            trigger.add_possible_ant(ant)
+
+                 if True in (f(tag) for f in functions):
+                     phrase = nt.get_nearest_phrase(nt.maketree(self.sentences[sentnum]['tree'][0]), i, pos_tests)
+                     phrase_length = nt.get_phrase_length(phrase)
+
+                     # if phrase_length <= 2:
+                     #     print phrase
+
+                     for j in range(i, min(i+phrase_length+1, len(self.sentences[sentnum]))):
+                         if not ant_after_trigger(sentnum, i, j, trigger):
+
+                             bad = False
+                             for pos_check in [wc.is_preposition, wc.is_punctuation, wc.is_determiner]:
+                                 if pos_check(self.sentences[sentnum].pos[j-1]):
+                                     bad = True
+
+                             if not bad:
+                                 ant = self.idxs_to_ant(sentnum, i, j, trigger)
+                                 if len(ant.sub_sentdict) > 0:
+                                     trigger.add_possible_ant(ant)
 
             #Lets use the tree to decrease the number of dumb candidates.
+
             phrases = [p for p in pos_tests if type(p)==str]
             tree = nt.maketree(self.get_sentence(sentnum)['tree'][0])
             tree_pos = nt.getsmallestsubtrees(tree)
             tree_words = tree.leaves()
             leaves_dict = { (tree_pos[i].label(), tree_words[i]) : i+1 for i in range(len(tree_words))}
+
+            new_ants = []
             for pos in phrases:
                 for position in nt.phrase_positions_in_tree(tree, pos):
                     start = None
                     for w in nt.getsmallestsubtrees(tree[position]):
                         # print w.label(), w[0]
                         end = (w.label(), w[0])
+
                         if not start:
                             start = end
-                        if sentnum == trigger.sentnum and leaves_dict[end] == trigger.wordnum \
-                                or wc.is_punctuation(end[0]):
+
+                        if sentnum == trigger.sentnum and leaves_dict[end] == trigger.wordnum or wc.is_punctuation(end[0]):
                             break
+
                         ant = self.idxs_to_ant(sentnum, leaves_dict[start], leaves_dict[end]+1, trigger)
-                        if len(ant.sub_sentdict) > 0:
-                            trigger.add_possible_ant(ant)
-                        # print 'added poss_ant: %d to %d'%(leaves_dict[start], leaves_dict[end]+1),trigger.possible_ants[-1]
+
+                        if len(ant.sub_sentdict) > 0 and not ant_after_trigger(sentnum, start, end, trigger)\
+                            and not ((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger) in new_ants):
+
+                            bad = False
+                            for pos_check in [wc.is_preposition, wc.is_punctuation]:
+                                if pos_check(self.sentences[sentnum].pos[j-1]):
+                                    bad = True
+
+                            if not bad:
+                                ant = self.idxs_to_ant(sentnum, i, j, trigger)
+                                if len(ant.sub_sentdict) > 0:
+                                    trigger.add_possible_ant(ant)
+                                    new_ants.append((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger))
+
+
+                            # print 'added poss_ant: %d to %d'%(leaves_dict[start], leaves_dict[end]+1),trigger.possible_ants[-1]
+
                     # raise Finished()
+
 
     def idxs_to_ant(self, sentnum, start, end, trigger):
         sentdict = self.sentences[sentnum]
-        return Antecedent(sentnum, trigger, SubSentDict(sentdict.words[start:end],
-                                                        sentdict.pos[start:end],
-                                                        sentdict.lemmas[start:end]),
+        return Antecedent(sentnum,
+                          trigger,
+                          SubSentDict(sentdict.words[start:end],
+                                      sentdict.pos[start:end],
+                                      sentdict.lemmas[start:end]),
                           start, end-1)
 
     def get_sentence_tree(self, i):
@@ -312,7 +361,8 @@ class SubSentDict:
 
     def __eq__(self, other):
         if type(self) is type(other):
-            return self.__dict__ == other.__dict__
+            return self.words == other.words and self.pos == other.pos and \
+                   self.start == other.start and self.end == other.end
         else:
             raise WrongClassEquivalenceException()
 
@@ -367,8 +417,10 @@ class SentDict:
             try:
                 if not raw and wc.is_auxiliary(self,i,AUX_LEMMAS,ALL_AUXILIARIES):
                     sent_auxs.append(Auxiliary(self.sentnum, self.words[i], self.lemmas[i], self.pos[i], i))
+
                 elif raw and wc.is_auxiliary(self,i,AUX_LEMMAS,ALL_AUXILIARIES,raw=raw):
                     sent_auxs.append(RawAuxiliary(self.words[i], i, self.sentnum))
+
             except AuxiliaryHasNoTypeException:
                 continue
         return sent_auxs
@@ -390,26 +442,48 @@ class SentDict:
     def get_nltk_tree(self):
         return nt.maketree(self.tree_text[0])
 
-    def chunked_dependencies(self, i, j, dep_names=('prep','adv','dobj','nsubj','nmod')):
+    def chunked_dependencies(self, i, j, dep_names=('prep','adv','dobj','nsubj')):
         """Here we will return a list of all relevant dependency clusters between word i and word j."""
-        deps = [dep for dep in self.dependencies if ((i <= dep.gov <= j) and (i <= dep.dependent <= j))]
-
-        # Dependency graph.
-        graph = {dep.gov:[] for dep in deps}
+        deps = [dep for dep in self.dependencies if ((i <= dep.gov <= j) and (i <= dep.dependent <= j)
+                                                                         and dep.name in dep_names)]
+        # This makes it so that the gov is always the smaller one.
         for dep in deps:
-            graph[dep.gov].append(dep)
+            if dep.gov > dep.dependent:
+                old_gov = dep.gov
+                dep.gov = dep.dependent
+                dep.dependent = old_gov
+
+        deps.sort(key=attrgetter('gov'))
+
+        # Here we are removing overlap by making earlier dependency chunks end by at most the index of the next start.
+        last_start = -1
+        last_stop = -1
+        for c in range(len(deps)):
+            dep = deps[c]
+
+            if not dep.gov > last_stop:
+                deps[c-1].dependent = dep.gov-1
+
+            last_stop = dep.dependent
 
         # Here we get the dependency constituents for each desired dependency in dep_names.
         chunks = []
-        for gov,dep_list in graph.iteritems():
-            for dep in dep_list:
-                for potential in dep_names:
-                    if dep.name.startswith(potential) and not dep.name == 'nsubjpass':
-                        i,j = min(gov,dep.dependent), max(gov+1,dep.dependent+1)
-                        chunks.append( {'name':dep.name, 'sentdict':SubSentDict( self.words[i:j], self.pos[i:j],
-                                                                                 self.lemmas[i:j], start=i, end=j)})
-                        break
+        for dep in deps:
+            k, p = dep.gov, dep.dependent+1
+            chunks.append( {'name':dep.name, 'sentdict':SubSentDict( self.words[k:p], self.pos[k:p],
+                                                                     self.lemmas[k:p], start=k, end=p)} )
+
+        if len(chunks) == 0:
+            chunks.append( {'name':None, 'sentdict':SubSentDict( self.words[i-1:i], self.pos[i-1:i],
+                                                                 self.lemmas[i-1:i], start=i-1, end=i)} )
+
         return chunks
+
+def chunks_to_string(chunk):
+    s = ''
+    for w in chunk['sentdict'].words:
+        s += w+' '
+    return s
 
 class Dependency:
     def __init__(self, name, gov, dependent):
@@ -586,8 +660,10 @@ class Antecedent:
     def contains_trigger(self):
         if self.sentnum != self.trigger.sentnum:
             return False
+
         # If the antecedent comes after the trigger, delete it.
-        if self.start >= self.trigger.wordnum or self.end >= self.trigger.wordnum:
+        if self.start >= self.trigger.wordnum or \
+                (self.start <= self.trigger.wordnum <= self.end):
             return True
 
     def set_score(self, weights):

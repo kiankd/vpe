@@ -58,12 +58,14 @@ class AntecedentClassifier:
         self.test_err = []
         self.diffs = []
 
-    def initialize(self, pos_tests, seed=1917, W=None, sd=99, test=0, delete_random=0.0, save=False, load=False, update=False):
+    def initialize(self, pos_tests, seed=1917, W=None, sd=99, test=0, delete_random=0.0,
+                   save=False, load=False, update=False, verbose=False):
         if not load:
             self.import_data()
             self.generate_possible_ants(pos_tests, sd, test=test, delete_random=delete_random)
+            self.debug_ant_selection()
             self.build_feature_vectors()
-            self.normalize()
+            # self.normalize()
         else:
             self.load_imported_data()
 
@@ -159,42 +161,57 @@ class AntecedentClassifier:
             trigger.possible_ants = []
 
             self.sentences.set_possible_ants(trigger, pos_tests, search_distance=sd)
-            trigger.possible_ants = np.array(trigger.possible_ants)
-
-            if delete_random:
-                size = len(trigger.possible_ants)
-                trigger.possible_ants = list(trigger.possible_ants[sample(range(size), int(size * delete_random))])
-
             trigger.possible_ants = list(trigger.possible_ants)
 
         # Delete antecedents that contain the trigger in them:
-        c=0
+        c = 0
+        num_ants = 0
+        duplicates = 0
+        all_ants = set([])
         for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
+            deletes = []
             for ant in trigger.possible_ants:
-                if ant.contains_trigger():
-                    c+=1
-                    trigger.possible_ants.remove(ant)
+                num_ants += 1
+
+                size = len(all_ants)
+                all_ants.add((ant.sentnum,ant.start,ant.end))
+
+                if len(all_ants) == size:
+                    duplicates += 1
+                    deletes.append(ant)
+
+                elif ant.contains_trigger():
+                    c += 1
+                    deletes.append(ant)
+
+            for ant in deletes:
+                trigger.possible_ants.remove(ant)
+
+        print '%d total ants after deletion - deleted the %d duplicates!'%(num_ants-duplicates, duplicates)
         print 'Deleted %d bad antecedents!'%c
 
     def bestk_ants(self, trigger, w, k=5):
         """Return the best k antecedents given the weight vector w with respect to the score attained."""
         for a in range(len(trigger.possible_ants)):
             trigger.possible_ants[a].set_score(w)
+
         return nlargest(k, trigger.possible_ants, key=vpe.Antecedent.get_score)
 
     def build_feature_vectors(self, verbose=True):
-        print 'Building feature vectors...'
-        """Build each feature vector for each possible antecedent and each gold antecedent - takes time."""
-        if verbose:
-            # bar = ProgBar(len(self.train_triggers+self.test_triggers)*len(self.train_triggers[0].possible_ants))
-            bar = ProgBar(len(self.train_triggers)+len(self.val_triggers)+len(self.test_triggers))
 
-        all_pos_tags = truth.extractdatafromfile(truth.EACH_UNIQUE_POS_FILE) # We only want to import this file once.
+        word2vec_dict = truth.loadword2vecs()
+        all_pos_tags = truth.extract_data_from_file(truth.EACH_UNIQUE_POS_FILE) # We only want to import this file once.
+
+        print 'Building feature vectors...'
+
+        bar = ProgBar(len(self.train_triggers)+len(self.val_triggers)+len(self.test_triggers))
 
         for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
-            alignment_matrix(self.sentences, trigger, dep_names=('prep','nsubj','dobj','nmod','adv','conj'), pos_tags=all_pos_tags)
-            if verbose:
-                bar.update()
+            alignment_matrix(self.sentences, trigger, word2vec_dict,
+                             dep_names= ('prep','nsubj','dobj','nmod','adv','conj','vmod','amod','csubj'),
+                             pos_tags= all_pos_tags)
+            # bar.update()
+
         return
 
     def initialize_weights(self, initial=None, seed=1917):
@@ -246,7 +263,8 @@ class AntecedentClassifier:
 
         s = ['\nMissed this many gold possible ants: %d'%missed,
             'That is %0.2f percent.'%(float(missed)/total),
-            'Average length of possible ants: %d\n'%np.mean(lengths)]
+            'Average length of possible ants: %d'%np.mean(lengths),
+             'Min/Max lengths: %d, %d\n'%(min(lengths),max(lengths))]
 
         for x in s:
             print x
@@ -319,6 +337,33 @@ class AntecedentClassifier:
             i += 1
         del i
 
+    def debug_alignment(self, verbose=False):
+        X = {}
+        for trigger in self.train_triggers:
+            for ant in trigger.possible_ants:
+                vec_tup = tuple(ant.x)
+                if not X.has_key(vec_tup):
+                    X[vec_tup] = [ant]
+                else:
+                    X[vec_tup].append(ant)
+
+        length_list = []
+        printed = False
+        for key in X:
+            length_list.append(len(X[key]))
+
+            if verbose and (not printed and len(X[key]) >= 79):
+                for ant in X[key]:
+                    print ant
+                print "\nTotal ants for this key: %d"%len(X[key])
+                print key
+                printed = True
+
+        print 'TOTAL : %d, UNIQUE : %d'%(sum(length_list), len(X))
+        print 'Average number of ants corresponding to same vec: %0.2f, min= %d, max= %d'%(np.mean(length_list),
+                                                                                           min(length_list),
+                                                                                           max(length_list))
+
     def fit(self, epochs=5, verbose=True, k=5, features_to_analyze=5):
         # ws = [copy(self.W_old)]
         i=0
@@ -340,7 +385,7 @@ class AntecedentClassifier:
                 self.test_err.append(self.accuracy(self.predict(self.test_triggers)))
 
                 print '\nEpoch %d - train/val/test error: %0.2f, %0.2f, %0.2f'\
-                      %(n, self.train_err[-1],self.val_err[-1],self.test_err[-1])
+                      %(n, self.train_err[-1], self.val_err[-1], self.test_err[-1])
 
                 # print 'Trigger sentnum,wordnum: %d,%d'%(trigger.sentnum,trigger.wordnum)
                 print self.sentences.get_sentence(trigger.sentnum)
@@ -457,7 +502,7 @@ class AntecedentClassifier:
         self.test_triggers = data[3]
 
 if __name__ == '__main__':
-    pos_tests = ['VP','ADJ-PRD','NP-PRD', wc.is_adjective, wc.is_verb]
+    pos_tests = ['VP', wc.is_adjective, wc.is_verb]
     debug = sys.argv[1] == 'debug'
 
     start_time = time.clock()
@@ -470,10 +515,11 @@ if __name__ == '__main__':
         a.initialize(pos_tests, W=initial_weights, sd=5, test=0, delete_random=0,
                  save=False, load=True, update=False, seed=2384834)
     else:
-        a = AntecedentClassifier(0,0, 0,0, 0,0)
+        a = AntecedentClassifier(0,0, None,None, None,None)
         print 'Debugging...'
         a.initialize(pos_tests, sd=5, save=False, load=False, update=False, seed=1917)
-
+        # a.debug_ant_selection(verbose=False)
+        a.debug_alignment(verbose=False)
         exit(0)
 
     # for trig in a.train_triggers:
@@ -499,10 +545,34 @@ if __name__ == '__main__':
     np.save('weights_c075_l0001_k5', np.array(a.W_avg))
 
 """
-1) Delete potential antecedents that contain the trigger in them!!!!! 
+
+1) Delete potential antecedents that contain the trigger in them  - DONE
+    --> Figure out why there seems to be low recall in getting gold ants for extraction - DONE AND FIXED
+    --> Rewrite potential antecedent extraction - DONE
+
 2) Check alignments between gold alignment vs bad antecedent alignment.
+    --> Need to make it so that chunks DONT overlap! No word repeats! - DONE no more overlapping
+    --> Figure out why there are so many repeated alignment vectors!
+        --> look at and compare ones with same vectors
+        --> try to abolish arbitrary featurism
+    --> Fix the context extraction so that we don't get super big contexts!
+
 3) Think about adding semantic info to the features - word2vec.
+    --> Measure to compare the difference between the word content!
+    --> Need to differentiate between different clauses of same syntactic structure
+    --> *** Add nice word2vec features:
+            Take average word2vec angle between all mappings
+            Make new features for:
+                if nsub/dobj etc. are mapped, make these 4 different features comparing word2vec sim btwn chunks.
+
+
+ACL DEADLINE = MARCH 18TH
+
 """
+
+
+
+
 
 # We were getting good with c=0.1 and lr = 0.0001, k=5!!!
 

@@ -48,7 +48,7 @@ WORD2VEC_FILE = 'word2vec_vectors_wsj_all_words.txt'
 
 
 WORD2VEC_LENGTH = 300
-SENTENCE_SEARCH_DISTANCE = 2 #TODO: NOTE THAT I CHANGE THIS TO SEARCH ONLY 1 SENTENCE BEHIND. PROBS CHANGE BACK!!!!!
+SENTENCE_SEARCH_DISTANCE = 1 #TODO: NOTE THAT I CHANGE THIS TO SEARCH ONLY 1 SENTENCE BEHIND. PROBS CHANGE BACK!!!!!
 MINIMUM_CONTEXT_DISTANCE = 3
 
 PP_TRAIN_ANTS_PER_TRIG = 5
@@ -67,7 +67,7 @@ def untruth(i):
     if i==1: return True
     return False
 
-def extractdatafromfile(file_name):
+def extract_data_from_file(file_name):
     ret = []
     f = open(SVM_FILE_LOCATIONS+file_name, 'r')
     for line in f:
@@ -87,6 +87,7 @@ def makefile(new_file_name, data):
     f.close()
 
 def loadword2vecs():
+    print 'Loading word2vec dictionary...'
     f = open(SVM_FILE_LOCATIONS+WORD2VEC_FILE, 'r')
     dic = {}
     for line in f:

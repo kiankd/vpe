@@ -245,14 +245,19 @@ def nielson_features(trig_sentdict, ant_sentdict, ant, trigger):
 
     return vector
 
-
 def vector_length(v1,v2=None):
-    if v2: return math.sqrt(np.dot(v1,v2))
-    else: return math.sqrt(np.dot(v1,v1))
+    if v2:
+        return math.sqrt(np.dot(v1,v2))
+    else:
+        return math.sqrt(np.dot(v1,v1))
 
 def angle_btwn_vectors(v1, v2, v1_length=None, v2_length=None):
-    if not v1_length: v1_length = vector_length(v1)
-    if not v2_length: v2_length = vector_length(v2)
+    if not v1_length:
+        v1_length = vector_length(v1)
+
+    if not v2_length:
+        v2_length = vector_length(v2)
+
     return math.acos( np.dot(v1,v2) / (v1_length * v2_length)) * 360.0 / 2.0 / np.pi
 
 def get_average_np_vec(word2vec_dict, sentdict, np_start, np_end):
