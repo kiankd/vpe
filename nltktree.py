@@ -29,7 +29,7 @@ def find_subtree_phrases(t, phrases):
     return subtrees
 
 def get_nearest_clause(tree, start, end=None):
-    clauses = ['S', 'SBAR', 'SQ', 'SBARQ','SINV']
+    clauses = ['S', 'SBAR', 'SQ', 'SBARQ']
 
     if not end:
         subtree = getsmallestsubtrees(tree)[start]

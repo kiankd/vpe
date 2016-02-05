@@ -442,7 +442,7 @@ class SentDict:
     def get_nltk_tree(self):
         return nt.maketree(self.tree_text[0])
 
-    def chunked_dependencies(self, i, j, dep_names=('prep','adv','dobj','nsubj','nmod')):
+    def chunked_dependencies(self, i, j, dep_names=('prep','adv','dobj','nsubj')):
         """Here we will return a list of all relevant dependency clusters between word i and word j."""
         deps = [dep for dep in self.dependencies if ((i <= dep.gov <= j) and (i <= dep.dependent <= j)
                                                                          and dep.name in dep_names)]
@@ -472,7 +472,18 @@ class SentDict:
             k, p = dep.gov, dep.dependent+1
             chunks.append( {'name':dep.name, 'sentdict':SubSentDict( self.words[k:p], self.pos[k:p],
                                                                      self.lemmas[k:p], start=k, end=p)} )
+
+        if len(chunks) == 0:
+            chunks.append( {'name':None, 'sentdict':SubSentDict( self.words[i-1:i], self.pos[i-1:i],
+                                                                 self.lemmas[i-1:i], start=i-1, end=i)} )
+
         return chunks
+
+def chunks_to_string(chunk):
+    s = ''
+    for w in chunk['sentdict'].words:
+        s += w+' '
+    return s
 
 class Dependency:
     def __init__(self, name, gov, dependent):

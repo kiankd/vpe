@@ -87,6 +87,7 @@ def makefile(new_file_name, data):
     f.close()
 
 def loadword2vecs():
+    print 'Loading word2vec dictionary...'
     f = open(SVM_FILE_LOCATIONS+WORD2VEC_FILE, 'r')
     dic = {}
     for line in f:

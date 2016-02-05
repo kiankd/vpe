@@ -194,6 +194,7 @@ class AntecedentClassifier:
         """Return the best k antecedents given the weight vector w with respect to the score attained."""
         for a in range(len(trigger.possible_ants)):
             trigger.possible_ants[a].set_score(w)
+
         return nlargest(k, trigger.possible_ants, key=vpe.Antecedent.get_score)
 
     def build_feature_vectors(self, verbose=True):
@@ -206,9 +207,10 @@ class AntecedentClassifier:
         bar = ProgBar(len(self.train_triggers)+len(self.val_triggers)+len(self.test_triggers))
 
         for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
-            alignment_matrix(self.sentences, trigger, dep_names=('prep','nsubj','dobj','nmod','adv','conj'),
-                             pos_tags=all_pos_tags)
-            bar.update()
+            alignment_matrix(self.sentences, trigger, word2vec_dict,
+                             dep_names= ('prep','nsubj','dobj','nmod','adv','conj','vmod','amod','csubj'),
+                             pos_tags= all_pos_tags)
+            # bar.update()
 
         return
 
