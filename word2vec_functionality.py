@@ -1,4 +1,5 @@
 import numpy as np
+import math
 from truth import WORD2VEC_LENGTH
 
 def vector_length(v):
@@ -6,7 +7,7 @@ def vector_length(v):
     :param v: List of floats
     :return: Float, the L2 norm of the vector.
     """
-    return math.sqrt(np.dot(ve1,ve1))
+    return math.sqrt(np.dot(v,v))
 
 def angle_btwn_vectors(v1, v2):
     """
@@ -17,7 +18,10 @@ def angle_btwn_vectors(v1, v2):
     v1_length = vector_length(v1)
     v2_length = vector_length(v2)
 
-    return math.acos( np.dot(v1,v2) / (v1_length * v2_length)) * 360.0 / 2.0 / np.pi
+    try:
+        return math.acos( np.dot(v1,v2) / (v1_length * v2_length)) * 360.0 / 2.0 / np.pi
+    except ValueError:
+        return 90.0
 
 def get_vec(word, word2vec_dict):
     """
@@ -26,8 +30,8 @@ def get_vec(word, word2vec_dict):
     :return: List, either the vector or an empty one if no key.
     """
     try:
-        assert len(word2vec_dict[key]) == WORD2VEC_LENGTH
-        return word2vec_dict[key]
+        assert len(word2vec_dict[word]) == WORD2VEC_LENGTH
+        return word2vec_dict[word]
 
     except KeyError:
         return []
@@ -44,7 +48,7 @@ def average_vec_for_list(words, word2vec_dict):
 
     keys_present = 0
     for word in words:
-        v = word2vec_dict[word]
+        v = get_vec(word, word2vec_dict)
         if v:
             keys_present += 1
             word_vecs.append(v)

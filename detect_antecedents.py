@@ -503,17 +503,22 @@ class AntecedentClassifier:
 
 if __name__ == '__main__':
     pos_tests = ['VP', wc.is_adjective, wc.is_verb]
-    debug = sys.argv[1] == 'debug'
+
+    try:
+        debug = sys.argv[1] == 'debug'
+    except IndexError:
+        debug = False
+        pass
 
     start_time = time.clock()
 
     if not debug:
         a = AntecedentClassifier(0,14, 15,19, 20,24, C=0.075, learn_rate=lambda x: 0.0001)
         print 'We missed %d vpe instances.'%a.missed_vpe
-        initial_weights = None #np.load('50epoch25k005c_weights.npy')
+        initial_weights = None
 
         a.initialize(pos_tests, W=initial_weights, sd=5, test=0, delete_random=0,
-                 save=False, load=True, update=False, seed=2384834)
+                 save=True, load=False, update=False, seed=2384834)
     else:
         a = AntecedentClassifier(0,0, None,None, None,None)
         print 'Debugging...'
