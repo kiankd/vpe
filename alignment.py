@@ -23,40 +23,23 @@ def alignment_matrix(sentences, trigger, word2vec_dict, dep_names=('prep','adv',
     """
     global MAPPING_LENGTHS
     ANT_CHUNK_LENGTHS = []
-    print '-----------'
 
     trig_sentdict = sentences.get_sentence(trigger.sentnum)
-    print trig_sentdict
 
     i,j = nearest_clause(trig_sentdict, trigger.wordnum-1) # WE NEED TO SUBTRACT BY ONE BECAUSE NO ROOT IN TREES
     trig_chunks = trig_sentdict.chunked_dependencies(i, j, dep_names=dep_names)
     remove_idxs(trig_chunks, trigger.wordnum, trigger.wordnum)
 
-    for chunk in trig_chunks:
-        pass
-        # print '\t'+chunks_to_string(chunk)
-
     for ant in trigger.possible_ants + [trigger.gold_ant]:
-        # print '\n---------------------MAPPING--------------------'
-        # print 'SENTENCE:',trig_sentdict.words_to_string()
-        # print trigger
-        # print ant,'%d - (%d,%d)\n'%(ant.sentnum,ant.start,ant.end)
-
         ant_sentdict = sentences.get_sentence(ant.sentnum)
-
-        # print '-----'
-        # print ant.sub_sentdict.words
 
         k,l = nearest_clause(ant_sentdict, ant.start-1, end=ant.end-1)
         ant_chunks = ant_sentdict.chunked_dependencies(k, l, dep_names=dep_names)
 
         ANT_CHUNK_LENGTHS.append(len(ant_chunks))
 
-        # print chunks_to_string(ant_chunks)
         remove_idxs(ant_chunks, ant.start, ant.end)
-
-        # print trigger
-        # print ant#,'%d - (%d,%d)\n'%(ant.sentnum,ant.start,ant.end)
+        remove_idxs(ant_chunks, trigger.wordnum, trigger.wordnum)
 
         mapping, untrigs, unants = align(trig_chunks, ant_chunks, dep_names, word2vec_dict)
 
@@ -64,12 +47,9 @@ def alignment_matrix(sentences, trigger, word2vec_dict, dep_names=('prep','adv',
                              + relational_vector(trigger, ant)
                              + avc.ant_trigger_relationship(ant, trigger, sentences, pos_tags))
 
-    # if 'industrial-production index' in trig_sentdict.words_to_string():
-    #     exit(0)
+    # print 'Avg mapping, trig_chunks, ant_chunks lengths: %0.2f, %d, %0.2f'\
+    #       %(np.mean(MAPPING_LENGTHS), len(trig_chunks),np.mean(ANT_CHUNK_LENGTHS))
 
-    print 'Avg mapping, trig_chunks, ant_chunks lengths: %0.2f, %d, %0.2f'%(np.mean(MAPPING_LENGTHS),
-                                                                            len(trig_chunks),
-                                                                            np.mean(ANT_CHUNK_LENGTHS))
     ANT_CHUNK_LENGTHS = []
     MAPPING_LENGTHS = []
     return
@@ -148,16 +128,20 @@ def alignment_vector(mapping, un_mapped_trigs, un_mapped_ants, dep_names, word2v
 
     # Given that we have the mapping, make its feature vector:
     v = []
+    mapping_length = len(mapping) if len(mapping) > 0 else 1
 
     # Easy vecs first: one hot encoding of number of unmapped chunks and the mapping.
     v += [1.0 if len(un_mapped_trigs) == i else 0.0 for i in range(one_hot_length)]
     v += [1.0 if not 1.0 in v[-one_hot_length:] else 0.0] # For encoding if we have more empty than the one-hot-length.
+    v.append(len(un_mapped_trigs)/mapping_length)
 
     v += [1.0 if len(un_mapped_ants) == i else 0.0 for i in range(one_hot_length)]
     v += [1.0 if not 1.0 in v[-one_hot_length:] else 0.0]
+    v.append(len(un_mapped_ants)/mapping_length)
 
     v += [1.0 if len(mapping) == i else 0.0 for i in range(one_hot_length)]
     v += [1.0 if not 1.0 in v[-one_hot_length:] else 0.0]
+    v.append((len(un_mapped_trigs)+len(un_mapped_ants))/mapping_length)
 
     # Now encode the dependencies that have been mapped to.
     mapped_trig_deps = [tup[0]['name'] for tup in mapping]
@@ -318,5 +302,5 @@ def find_word_sequence(words, targets):
 # TODO: !!!
 """
 ADD FEATURE - NUMBER/PROPORTION OF UNMAPPED WORDS
-GET rid of trigger's clause from antecedent
+GET rid of trigger's clause from antecedent chunks
 """
