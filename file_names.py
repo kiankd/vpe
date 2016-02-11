@@ -53,8 +53,12 @@ class Files:
     WORD2VEC_FILE = 'word2vec_vectors_wsj_all_words.txt'
 
     WORD2VEC_LENGTH = 300
+
     def __init__(self):
         self.SVM_FILE_LOCATIONS = self.DROP_BOX_DIR+'project'+self.SLASH_CHAR+'svm_logs'+self.SLASH_CHAR
+
+        if platform == 'linux2':
+            self.SVM_FILE_LOCATIONS = self.FULL_PROJECT_DIR+'helper_files/'
 
     def extract_data_from_file(self, file_name):
         ret = []
