@@ -2,13 +2,13 @@ import vpe_objects as vpe
 import numpy as np
 import word_characteristics as wc
 import antecedent_vector_creation as avc
+import optimize_mira_dual as mira
 import truth
 import time
 import sys
 from heapq import nlargest
 from os import listdir
 from pyprind import ProgBar
-from optimize_mira_dual import update_weights,Capturing
 from random import randrange,sample
 from matplotlib import pyplot as plt
 from alignment import alignment_matrix
@@ -58,28 +58,43 @@ class AntecedentClassifier:
         self.test_err = []
         self.diffs = []
 
-    def initialize(self, pos_tests, seed=1917, W=None, sd=99, test=0, delete_random=0.0,
+    def reset(self):
+        self.W_avg = None
+        self.W_old = None
+        self.norms = []
+        self.feature_vals = []
+        self.feature_names = []
+        self.random_features = []
+        self.train_err = []
+        self.val_err = []
+        self.test_err = []
+        self.diffs = []
+
+    def initialize(self, pos_tests, seed=1917, W=None, test=0, delete_random=0.0,
                    save=False, load=False, update=False, verbose=False):
         if not load:
             self.import_data()
-            self.generate_possible_ants(pos_tests, sd, test=test, delete_random=delete_random)
+            self.generate_possible_ants(pos_tests, test=test, delete_random=delete_random)
             self.debug_ant_selection()
             self.build_feature_vectors()
-            # self.normalize()
+            self.normalize()
+
         else:
             self.load_imported_data()
-
             if update:
-                self.generate_possible_ants(pos_tests, sd)
-                self.build_feature_vectors()
                 self.normalize()
-            c=0
-            for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
-                for ant in trigger.possible_ants:
-                    if ant.contains_trigger():
-                        c+=1
-                        trigger.possible_ants.remove(ant)
-            print 'Deleted %d ants!'%c
+
+            # if update:
+            #     self.generate_possible_ants(pos_tests)
+            #     self.build_feature_vectors()
+            #     self.normalize()
+            # c=0
+            # for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
+            #     for ant in trigger.possible_ants:
+            #         if ant.contains_trigger():
+            #             c+=1
+            #             trigger.possible_ants.remove(ant)
+            # print 'Deleted %d ants!'%c
 
         if save:
             self.save_imported_data()
@@ -142,17 +157,13 @@ class AntecedentClassifier:
                         sentnum_modifier = len(self.sentences)-1
             dnum += 1
 
-    def score(self, ant):
-        """Multiply the weight vector times the antcedent feature vector."""
-        return np.dot(self.weights, ant.x)
-
-    def generate_possible_ants(self, pos_tests, sd=99, test=0, delete_random=0.0):
+    def generate_possible_ants(self, pos_tests, test=0, delete_random=0.0):
         """Generate all candidate antecedents."""
         print 'Generating possible antecedents...'
         if test: # ONLY FOR TESTING! THIS CHEATS!!
             for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
                 trigger.possible_ants = []
-                self.sentences.set_possible_ants(trigger, pos_tests, search_distance=sd)
+                self.sentences.set_possible_ants(trigger, pos_tests)
                 trigger.possible_ants = [trigger.gold_ant] + trigger.possible_ants[0:test]
             return
 
@@ -160,7 +171,7 @@ class AntecedentClassifier:
         for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
             trigger.possible_ants = []
 
-            self.sentences.set_possible_ants(trigger, pos_tests, search_distance=sd)
+            self.sentences.set_possible_ants(trigger, pos_tests)
             trigger.possible_ants = list(trigger.possible_ants)
 
         # Delete antecedents that contain the trigger in them:
@@ -210,7 +221,7 @@ class AntecedentClassifier:
             alignment_matrix(self.sentences, trigger, word2vec_dict,
                              dep_names= ('prep','nsubj','dobj','nmod','adv','conj','vmod','amod','csubj'),
                              pos_tags= all_pos_tags)
-            # bar.update()
+            bar.update()
 
         return
 
@@ -370,13 +381,10 @@ class AntecedentClassifier:
         for n in range(epochs):
             for trigger in shuffle(self.train_triggers):
                 bestk = self.bestk_ants(trigger, self.W_old, k=k)
-                self.analyze(self.W_old, features_to_analyze)
 
-                # ws.append(copy(self.W_old))
-                # self.W_avg = np.mean(ws[1:],axis=0)
-
-                self.W_old = update_weights(self.W_old, bestk, trigger.gold_ant, self.loss_function, C=self.C)
+                self.W_old = mira.update_weights(self.W_old, bestk, trigger.gold_ant, self.loss_function, C=self.C)
                 self.W_avg = ((1.0-self.learn_rate(i)) * self.W_avg) + (self.learn_rate(i) * self.W_old) # Running average.
+                self.analyze(self.W_avg, features_to_analyze)
                 i+=1
 
             if verbose and n>0:
@@ -396,7 +404,7 @@ class AntecedentClassifier:
                 print 'Best ant:', best_ant
 
                 self.diffs.append(np.mean((self.W_avg-self.W_old)**2))
-                print 'Difference btwen avg vector w_old: %0.3f'%(self.diffs[-1])
+                print 'Difference btwen avg vector w_old: %0.6f'%(self.diffs[-1])
 
     def predict(self, trigger_list):
         predictions = []
@@ -449,8 +457,8 @@ class AntecedentClassifier:
             self.feature_vals[i+1].append(w[self.random_features[i]])
         self.feature_vals[-1].append(w[-1])
 
-    def make_graphs(self,k,name):
-        params = 'tests/%s_c%d_k%d_'%(name,self.C*1000,k)
+    def make_graphs(self, name):
+        params = 'tests/post_changes/%s'%name
 
         plt.figure(1)
         plt.title('Weight Vector 2-Norm Change')
@@ -503,21 +511,27 @@ class AntecedentClassifier:
 
 if __name__ == '__main__':
     pos_tests = ['VP', wc.is_adjective, wc.is_verb]
-    debug = sys.argv[1] == 'debug'
+
+    try:
+        debug = sys.argv[1] == 'debug'
+    except IndexError:
+        debug = False
+        pass
 
     start_time = time.clock()
 
     if not debug:
-        a = AntecedentClassifier(0,14, 15,19, 20,24, C=0.075, learn_rate=lambda x: 0.0001)
+        a = AntecedentClassifier(0,0, None,None, None,None, C=0.075, learn_rate=lambda x: 0.0001)
         print 'We missed %d vpe instances.'%a.missed_vpe
-        initial_weights = None #np.load('50epoch25k005c_weights.npy')
+        initial_weights = None
 
-        a.initialize(pos_tests, W=initial_weights, sd=5, test=0, delete_random=0,
-                 save=False, load=True, update=False, seed=2384834)
+        a.initialize(pos_tests, W=initial_weights, test=0, delete_random=0,
+                 save=False, load=False, update=False, seed=2384834)
+
     else:
         a = AntecedentClassifier(0,0, None,None, None,None)
         print 'Debugging...'
-        a.initialize(pos_tests, sd=5, save=False, load=False, update=False, seed=1917)
+        a.initialize(pos_tests, save=False, load=False, update=False, seed=2384834)
         # a.debug_ant_selection(verbose=False)
         a.debug_alignment(verbose=False)
         exit(0)
@@ -536,9 +550,9 @@ if __name__ == '__main__':
 
     try:
         a.fit(epochs=500, k=K, verbose=True)
-        a.make_graphs(K, name)
+        a.make_graphs(name)
     except KeyboardInterrupt:
-        a.make_graphs(K, name)
+        a.make_graphs(name)
         print 'Time taken: %0.2f'%(time.clock() - start_time)
 
     print 'Time taken: %0.2f'%(time.clock() - start_time)

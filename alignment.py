@@ -13,6 +13,7 @@ import antecedent_vector_creation as avc
 import word2vec_functionality as w2v
 
 MAPPING_LENGTHS = []
+MAX_SCORE = 4.0
 
 def alignment_matrix(sentences, trigger, word2vec_dict, dep_names=('prep','adv','dobj','nsubj','nmod'), pos_tags=None):
     """
@@ -22,50 +23,33 @@ def alignment_matrix(sentences, trigger, word2vec_dict, dep_names=('prep','adv',
     """
     global MAPPING_LENGTHS
     ANT_CHUNK_LENGTHS = []
-    print '-----------'
 
     trig_sentdict = sentences.get_sentence(trigger.sentnum)
-    print trig_sentdict
 
     i,j = nearest_clause(trig_sentdict, trigger.wordnum-1) # WE NEED TO SUBTRACT BY ONE BECAUSE NO ROOT IN TREES
     trig_chunks = trig_sentdict.chunked_dependencies(i, j, dep_names=dep_names)
     remove_idxs(trig_chunks, trigger.wordnum, trigger.wordnum)
 
-    for chunk in trig_chunks:
-        print '\t'+chunks_to_string(chunk)
-
     for ant in trigger.possible_ants + [trigger.gold_ant]:
-        # print '\n---------------------MAPPING--------------------'
-        # print 'SENTENCE:',trig_sentdict.words_to_string()
-        # print trigger
-        # print ant,'%d - (%d,%d)\n'%(ant.sentnum,ant.start,ant.end)
-
         ant_sentdict = sentences.get_sentence(ant.sentnum)
-        # print ant_sentdict.words
-        # print ant.sub_sentdict.words
+
         k,l = nearest_clause(ant_sentdict, ant.start-1, end=ant.end-1)
         ant_chunks = ant_sentdict.chunked_dependencies(k, l, dep_names=dep_names)
 
         ANT_CHUNK_LENGTHS.append(len(ant_chunks))
 
-        # print chunks_to_string(ant_chunks)
         remove_idxs(ant_chunks, ant.start, ant.end)
-
-        # print trigger
-        # print ant#,'%d - (%d,%d)\n'%(ant.sentnum,ant.start,ant.end)
+        remove_idxs(ant_chunks, trigger.wordnum, trigger.wordnum)
 
         mapping, untrigs, unants = align(trig_chunks, ant_chunks, dep_names, word2vec_dict)
 
-        ant.x = np.array([1] + alignment_vector(mapping, untrigs, unants, dep_names, verbose=False))
-                             # + relational_vector(trigger, ant)
-                             # + avc.ant_trigger_relationship(ant, trigger, sentences, pos_tags))
+        ant.x = np.array([1] + alignment_vector(mapping, untrigs, unants, dep_names, word2vec_dict, verbose=False)
+                             + relational_vector(trigger, ant)
+                             + avc.ant_trigger_relationship(ant, trigger, sentences, pos_tags))
 
-    # if 'industrial-production index' in trig_sentdict.words_to_string():
-    #     exit(0)
+    # print 'Avg mapping, trig_chunks, ant_chunks lengths: %0.2f, %d, %0.2f'\
+    #       %(np.mean(MAPPING_LENGTHS), len(trig_chunks),np.mean(ANT_CHUNK_LENGTHS))
 
-    print 'Avg mapping, trig_chunks, ant_chunks lengths: %0.2f, %d, %0.2f'%(np.mean(MAPPING_LENGTHS),
-                                                                            len(trig_chunks),
-                                                                            np.mean(ANT_CHUNK_LENGTHS))
     ANT_CHUNK_LENGTHS = []
     MAPPING_LENGTHS = []
     return
@@ -95,7 +79,7 @@ def mapping_to_string(mapping):
             continue
     return s
 
-def align(t_chunks, a_chunks, dep_names, word2vec_dict, threshold=0.65, verbose=False):
+def align(t_chunks, a_chunks, dep_names, word2vec_dict, threshold=0.15, verbose=False):
     """
     Creates an alignment between the chunks of a trigger context and antecedent context.
     :param t_chunks: List of chunks created for the trigger's context
@@ -116,7 +100,7 @@ def align(t_chunks, a_chunks, dep_names, word2vec_dict, threshold=0.65, verbose=
 
         for j in range(len(a_chunks)):
             achunk = a_chunks[j]
-            s = similarity_score(tchunk, achunk, word2vec_dict, abs(i-j)/len(t_chunks))
+            s = similarity_score(tchunk, achunk, word2vec_dict)
 
             if s > threshold:
                 if tchunk in un_mapped_trigs:
@@ -127,25 +111,16 @@ def align(t_chunks, a_chunks, dep_names, word2vec_dict, threshold=0.65, verbose=
 
                 mapping.append((tchunk, achunk, s))
 
-    for chunk in a_chunks:
-        print chunks_to_string(chunk)
-    print mapping_to_string(mapping)
+    # for chunk in a_chunks:
+    #     print chunks_to_string(chunk)
+    #
+    # print mapping_to_string(mapping)
 
     MAPPING_LENGTHS.append(len(mapping))
 
-    # if verbose:
-    #     print '--------------\nFrom this ant-chunks to this trig-chunks:'
-    #     print a_chunks
-    #     print t_chunks
-    #     print "mapping:",mapping
-    #     print 'Null trig chunks:'
-    #     print un_mapped_trigs
-    #     print 'Null ant chunks:'
-    #     print un_mapped_ants
-
     return mapping, un_mapped_trigs, un_mapped_ants
 
-def alignment_vector(mapping, un_mapped_trigs, un_mapped_ants, dep_names, one_hot_length=5, verbose=False):
+def alignment_vector(mapping, un_mapped_trigs, un_mapped_ants, dep_names, word2vec_dict, one_hot_length=5, verbose=False):
     """
         This creates an alignment between the dependency chunks of a trigger and potential antecedent,
         then returns the feature vector representing that alignment.
@@ -153,16 +128,20 @@ def alignment_vector(mapping, un_mapped_trigs, un_mapped_ants, dep_names, one_ho
 
     # Given that we have the mapping, make its feature vector:
     v = []
+    mapping_length = len(mapping) if len(mapping) > 0 else 1
 
     # Easy vecs first: one hot encoding of number of unmapped chunks and the mapping.
     v += [1.0 if len(un_mapped_trigs) == i else 0.0 for i in range(one_hot_length)]
     v += [1.0 if not 1.0 in v[-one_hot_length:] else 0.0] # For encoding if we have more empty than the one-hot-length.
+    v.append(len(un_mapped_trigs)/mapping_length)
 
     v += [1.0 if len(un_mapped_ants) == i else 0.0 for i in range(one_hot_length)]
     v += [1.0 if not 1.0 in v[-one_hot_length:] else 0.0]
+    v.append(len(un_mapped_ants)/mapping_length)
 
     v += [1.0 if len(mapping) == i else 0.0 for i in range(one_hot_length)]
     v += [1.0 if not 1.0 in v[-one_hot_length:] else 0.0]
+    v.append((len(un_mapped_trigs)+len(un_mapped_ants))/mapping_length)
 
     # Now encode the dependencies that have been mapped to.
     mapped_trig_deps = [tup[0]['name'] for tup in mapping]
@@ -173,48 +152,85 @@ def alignment_vector(mapping, un_mapped_trigs, un_mapped_ants, dep_names, one_ho
     v += [1.0 if dep_name in mapped_ant_deps else 0.0 for dep_name in dep_names]
     v += [1.0 if not 1.0 in v[-len(dep_names):] else 0.0]
 
+    mapped_dep_tups = [(tup[0]['name'], tup[1]['name']) for tup in mapping]
+    for d1 in dep_names:
+        for d2 in dep_names:
+            if (d1, d2) in mapped_dep_tups:
+                v.append(1.0)
+            else:
+                v.append(0.0)
 
-    # TODO: FRACTIONIZE THESE!!!!!
     a = [len(tup[0]['sentdict'].words) for tup in mapping]
     b = [len(tup[1]['sentdict'].words) for tup in mapping]
     c = [len(chunk['sentdict'].words) for chunk in un_mapped_ants]
     d = [len(chunk['sentdict'].words) for chunk in un_mapped_trigs]
+
     for l in [a,b,c,d]:
         if not l:
-            v += [ 1.0, 0.0, 0.0 ]
+            v += [ 0.0, 0.0 ]
         else:
-            v += [ 0.0, float(min(l))/max(l), np.mean(l)/max(l) ]
+            v += [ float(min(l))/max(l), np.mean(l)/max(l) ]
 
     # Now encode the mean and standard deviation of the scores, min and max of scores:
     scores = [tup[2] for tup in mapping]
     if len(scores):
-        v += [np.mean(scores), np.std(scores)]
-        v += [min(scores), max(scores)]
+        v += [np.mean(scores), np.std(scores), min(scores), max(scores)]
     else:
         v += [0.0, 0.0, 0.0, 0.0]
-    #
-    # print t_chunks
-    # print a_chunks
-    # print mapping
-    # print v
-    # print '-----------------------'
+
+    angles = []
+    for tup in mapping:
+        a = angle_between_chunks(tup[0], tup[1], word2vec_dict)
+        if a:
+            angles.append(a)
+
+    if angles:
+        v += [np.mean(angles), np.std(angles), min(angles), max(angles)]
+    else:
+        v += [0.0, 0.0, 0.0, 0.0]
 
     return v
 
-def similarity_score(c1, c2, distance_cost, word2vec_dict, words_weight=0.5, pos_weight=0.3, lemma_weight=0.2):
+def angle_between_chunks(c1, c2, word2vec_dict):
+    c1_vec = w2v.average_vec_for_list(c1['sentdict'].words, word2vec_dict)
+    c2_vec = w2v.average_vec_for_list(c2['sentdict'].words, word2vec_dict)
+
+    if c1_vec and c2_vec:
+        return w2v.angle_btwn_vectors(c1_vec, c2_vec)
+    else:
+        return None
+
+def similarity_score(c1, c2, word2vec_dict, words_weight=0.2, pos_weight=0.5, lemma_weight=0.3, punish=False):
     """
         Scores the similarity between 2 chunks.
         If both chunks have the same dependency then they get a high score.
     """
     score = 0.0
-    if c1['name'] == c2['name']:
+
+    if c1['name'] == c2['name'] == 'nsubj':
+        score += 1.5
+
+    elif c1['name'] == c2['name']:
         score += 3.0
+
     score += f1_similarity(c1['sentdict'].words, c2['sentdict'].words) * words_weight
     score += f1_similarity(c1['sentdict'].pos, c2['sentdict'].pos) * pos_weight
     score += f1_similarity(c1['sentdict'].lemmas, c2['sentdict'].lemmas) * lemma_weight
-    score -= distance_cost
 
-    c1_vec = w2v.average_vec_for_list()
+    if punish:
+        if f1_similarity(c1['sentdict'].words, c2['sentdict'].words) == 0.0:
+            score -= words_weight
+
+        if f1_similarity(c1['sentdict'].pos, c2['sentdict'].pos) == 0.0:
+            score -= pos_weight
+
+        if f1_similarity(c1['sentdict'].lemmas, c2['sentdict'].lemmas) == 0.0:
+            score -= lemma_weight
+
+    # a = angle_between_chunks(c1, c2, word2vec_dict)
+    #
+    # if a:
+    #     score += (90.0-a) / 90.0
 
     return score
 
@@ -222,8 +238,10 @@ def f1_similarity(l1, l2):
     tp = float(len([v for v in l1 if v in l2]))
     fp = float(len([v for v in l1 if not v in l2]))
     fn = float(len([v for v in l2 if not v in l1]))
+
     precision = tp/(tp+fp)
     recall = tp/(tp+fn)
+
     try:
         return 1.0 - (2.0*precision*recall)/(precision+recall)
     except ZeroDivisionError:
@@ -280,3 +298,9 @@ def find_word_sequence(words, targets):
             count = 0
 
     return start,end
+
+# TODO: !!!
+"""
+ADD FEATURE - NUMBER/PROPORTION OF UNMAPPED WORDS
+GET rid of trigger's clause from antecedent chunks
+"""

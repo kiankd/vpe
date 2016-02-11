@@ -77,7 +77,7 @@ class AllSentences:
         """
         return self.sentences[i]
 
-    def set_possible_ants(self, trigger, pos_tests, search_distance=99):
+    def set_possible_ants(self, trigger, pos_tests):
         for sentnum in range(max(0, trigger.sentnum - SENTENCE_SEARCH_DISTANCE), trigger.sentnum+1):
             functions = [f for f in pos_tests if hasattr(f, '__call__')]
 

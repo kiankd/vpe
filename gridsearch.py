@@ -1,40 +1,39 @@
+import itertools
+import numpy as np
+import word_characteristics as wc
+import random
+from detect_antecedents import AntecedentClassifier
+
 # Purpose:
 #   to make an exhaustive list of hyperparameter combinations.
 
 def build_grid(params):
-    ret = []
-    num_tuples = 1
-    for key in params:
-        num_tuples *= len(params[key])
+    grid = []
+    for combo in itertools.product(*params):
+        grid.append(combo)
 
-    dicts = [{} for _ in range(num_tuples)]
-    for key in params:
-        for val in params[key]:
-            for d in dicts:
-                if not key in d:
-                    d[key] = val
+    return grid
 
-    return dicts
+if __name__ == '__main__':
+    grid = build_grid(
+         [[10.0**i for i in range(-4,2)],
+          [10.0**i for i in range(-4,0)] + [0.99],
+          [5]]
+    )
+    random.shuffle(grid)
 
-grid = build_grid({'C':[1,2,3],'a':[0.1,0.001,0.0001],'k':[5,10,15,20]})
+    a = AntecedentClassifier(0,14, 15,19, 20,24)
+    a.initialize(['VP', wc.is_adjective, wc.is_verb], seed=9001, save=False, load=True, update=False)
 
+    for combo in grid:
+        print "Current Params: ",combo
+        a.C = combo[0]
+        a.learn_rate = lambda x: combo[1]
+        name = 'full_c%s_lr%s_k%s_'%(combo[0], combo[1], combo[2])
 
+        a.fit(epochs=100, k=combo[2])
+        a.make_graphs(name)
+        np.save('saved_weights/'+name, np.array(a.W_avg))
 
-
-"""
-'C':[1,10,100]
-'a':[0.1,0.05,0.001]
-'x':[5,25,50]
-
-RETURN:
-
-[
- {'C':1, 'a':0.1, 'x':5}
- {'C':1, 'a':0.05, 'x':5}
- {'C':1, 'a':0.001, 'x':5}
- {'C':1, 'a':0.1, 'x':25}
- {'C':1, 'a':0.1, 'x':50}
- {'C':10, 'a':0.05, 'x':5}
- ...
-]
-"""
+        a.reset()
+        a.initialize_weights(seed=9001)
