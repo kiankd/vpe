@@ -1,3 +1,6 @@
+import matplotlib
+matplotlib.use('Agg')
+
 import vpe_objects as vpe
 import numpy as np
 import word_characteristics as wc
