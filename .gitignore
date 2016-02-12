@@ -5,3 +5,5 @@ __pychache__
 
 *.pyc
 tests/post_changes/broken
+old/
+old/*

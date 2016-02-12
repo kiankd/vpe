@@ -19,9 +19,10 @@ def build_grid(params):
 def completed_combos():
     combos = set([])
     for fname in os.listdir('tests/post_changes/'):
-        splitt = fname.split('_')
-        c, lr, k = float(splitt[1][1:]), float(splitt[2][2:]), float(splitt[3][1:])
-        combos.add((c,lr,k))
+        if not fname.startswith('.'):
+            splitt = fname.split('_')
+            c, lr, k = float(splitt[1][1:]), float(splitt[2][2:]), float(splitt[3][1:])
+            combos.add((c,lr,k))
     return combos
 
 if __name__ == '__main__':
@@ -42,7 +43,7 @@ if __name__ == '__main__':
             print "Current Params: ",combo
             a.C = combo[0]
             a.learn_rate = lambda x: combo[1]
-            name = 'full_c%s_lr%s_k%s_'%(combo[0], combo[1], combo[2])
+            name = 'TEST_c%s_lr%s_k%s_'%(combo[0], combo[1], combo[2])
 
             a.fit(epochs=100, k=combo[2])
             a.make_graphs(name)

@@ -594,8 +594,8 @@ class AntecedentClassifier:
         with open(destination+'.txt','w') as f:
             f.write(write_string)
 
-        np.save(destination+'.npy', np.array([self.train_err,self.val_err,self.test_err,
-                                             self.train_results,self.val_results,self.test_results]))
+        np.save(destination,
+                np.array([self.train_err,self.val_err,self.test_err,[self.train_results,self.val_results,self.test_results]]))
 
     def save_imported_data(self, name=''):
         print 'Saving the data...'
