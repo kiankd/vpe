@@ -467,8 +467,8 @@ class AntecedentClassifier:
             if ant.sentnum != gold.sentnum:
                 continue
 
-            antwords = ant.sub_sentdict['words']
-            goldwords = gold.sub_sentdict['words']
+            antwords = ant.sub_sentdict.words
+            goldwords = gold.sub_sentdict.words
 
             em = antwords == goldwords
             hm = antwords[0] == goldwords[0]
