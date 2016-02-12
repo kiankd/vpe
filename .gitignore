@@ -4,3 +4,4 @@ gurobi.log
 __pychache__
 
 *.pyc
+tests/post_changes/broken

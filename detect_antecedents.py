@@ -59,6 +59,7 @@ class AntecedentClassifier:
         self.train_err = []
         self.val_err = []
         self.test_err = []
+        self.train_results, self.val_results, self.test_results = [], [], []
         self.diffs = []
 
     def reset(self):
@@ -72,6 +73,7 @@ class AntecedentClassifier:
         self.val_err = []
         self.test_err = []
         self.diffs = []
+        self.train_results, self.val_results, self.test_results = [], [], []
 
     def initialize(self, pos_tests, seed=1917, W=None, test=0, delete_random=0.0,
                    save=False, load=False, update=False, verbose=False):
@@ -391,9 +393,17 @@ class AntecedentClassifier:
                 i+=1
 
             if verbose and n>0:
-                self.train_err.append(self.accuracy(self.predict(self.train_triggers)))
-                self.val_err.append(self.accuracy(self.predict(self.val_triggers)))
-                self.test_err.append(self.accuracy(self.predict(self.test_triggers)))
+                train_preds = self.predict(self.train_triggers)
+                val_preds = self.predict(self.val_triggers)
+                test_preds = self.predict(self.test_triggers)
+
+                self.train_err.append(self.accuracy(train_preds))
+                self.val_err.append(self.accuracy(val_preds))
+                self.test_err.append(self.accuracy(test_preds))
+
+                self.train_results.append(self.criteria_based_results(train_preds))
+                self.val_results.append(self.criteria_based_results(val_preds))
+                self.test_results.append(self.criteria_based_results(test_preds))
 
                 print '\nEpoch %d - train/val/test error: %0.2f, %0.2f, %0.2f'\
                       %(n, self.train_err[-1], self.val_err[-1], self.test_err[-1])
@@ -403,11 +413,13 @@ class AntecedentClassifier:
 
                 best_ant = self.bestk_ants(trigger, self.W_avg, k=1)[0]
                 # print 'Best_ant sentnum = %d, start,end = %d,%d:'%(best_ant.sentnum,best_ant.start,best_ant.end),
-                print 'Best ant: start %d, end %d, trigger wordnum %d.'%(best_ant.start, best_ant.end, best_ant.trigger.wordnum)
-                print 'Best ant:', best_ant
+                print 'Best ant: start %d, end %d, trigger wordnum %d: ',best_ant%(best_ant.start, best_ant.end, best_ant.trigger.wordnum)
 
                 self.diffs.append(np.mean((self.W_avg-self.W_old)**2))
                 print 'Difference btwen avg vector w_old: %0.6f'%(self.diffs[-1])
+        self.train_results = np.array(self.train_results)
+        self.val_results = np.array(self.val_results)
+        self.test_results = np.array(self.test_results)
 
     def predict(self, trigger_list):
         predictions = []
@@ -444,6 +456,34 @@ class AntecedentClassifier:
             errors.append(self.loss_function(ant.trigger.gold_ant, ant))
         return float(np.mean(errors, dtype=np.float64))
 
+    def criteria_based_results(self, predictions):
+        exact_match = 0
+        head_match = 0
+        head_overlap = 0
+
+        for ant in predictions:
+            gold = ant.trigger.gold_ant
+
+            if ant.sentnum != gold.sentnum:
+                continue
+
+            antwords = ant.sub_sentdict['words']
+            goldwords = gold.sub_sentdict['words']
+
+            em = antwords == goldwords
+            hm = antwords[0] == goldwords[0]
+            ho = antwords[0] in goldwords
+
+            if em: exact_match += 1
+            if hm: head_match += 1
+            if ho: head_overlap += 1
+
+        exact_match /= float(len(predictions))
+        head_match /= float(len(predictions))
+        head_overlap /= float(len(predictions))
+
+        return [exact_match, head_match, head_overlap]
+
     def analyze(self, w, num_features):
         self.norms.append(np.linalg.norm(w))
 
@@ -464,24 +504,24 @@ class AntecedentClassifier:
         params = 'tests/post_changes/%s'%name
 
         plt.figure(1)
-        plt.title('Weight Vector 2-Norm Change')
+        plt.title('Running Average Weight Vector 2-Norm over time')
         plt.plot(range(len(self.norms)), self.norms, 'b-')
         plt.savefig(params+'norm_change1.png', bbox_inches='tight')
-        # plt.show()
+        plt.clf()
 
         colors = ['b','y','m','r','g']
-        fig = plt.figure(2)
+        plt.figure(2)
         ax = plt.subplot(111)
-        plt.title('Exact Feature Value Change')
+        plt.title('Exact Feature Values over time')
         for i in range(len(self.feature_vals)):
             ax.plot(range(len(self.feature_vals[i])), self.feature_vals[i], colors[i%len(colors)]+'-', label=self.feature_names[i])
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
         ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.savefig(params+'feature_value_change1.png', bbox_inches='tight')
-        # plt.show()
+        plt.clf()
 
-        err_fig = plt.figure(3)
+        plt.figure(3)
         ax = plt.subplot(111)
         plt.title('Train/Val/Test Error over time')
         ax.plot(range(len(self.train_err)), self.train_err, 'b-', label='Train')
@@ -491,13 +531,71 @@ class AntecedentClassifier:
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
         ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.savefig(params+'errors.png', bbox_inches='tight')
-
+        plt.clf()
 
         plt.figure(4)
-        plt.title('Squared Weight Vector Change')
+        plt.title('Squared Difference between average and MIRA weight vector')
         plt.plot(range(len(self.diffs)), self.diffs, 'bo')
         plt.savefig(params+'weight_vector_change1.png', bbox_inches='tight')
-        # plt.show()
+        plt.clf()
+
+        plt.figure(5)
+        ax = plt.subplot(111)
+        plt.title('Head match results over time')
+        ax.plot(range(len(self.train_results)), self.train_results[:,1], 'b-', label='Train')
+        ax.plot(range(len(self.val_results)), self.val_results[:,1], 'y-', label='Validation')
+        ax.plot(range(len(self.test_results)), self.test_results[:,1], 'r-', label='Test')
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        plt.savefig(params+'results.png', bbox_inches='tight')
+        plt.clf()
+
+    def log_results(self, name):
+        destination = 'ant_results/'+name
+
+        errors = []
+        for lst in self.train_err, self.val_err, self.test_err:
+            lowest_error = 100
+            epoch = 0
+            for i in range(len(lst)):
+                if lst[i] < lowest_error:
+                    lowest_error = lst[i]
+                    epoch = i
+            errors.append((lowest_error,epoch))
+
+        results = []
+        for lst in self.train_results, self.val_results, self.test_results:
+            best_em, best_hm, best_ho = 0,0,0
+            em_epoch, hm_epoch, ho_epoch = 0,0,0
+            for i in range(len(lst)):
+                if lst[i][0] > best_em:
+                    best_em = lst[i][0]
+                    em_epoch = i
+
+                if lst[i][1] > best_hm:
+                    best_hm = lst[i][1]
+                    hm_epoch = i
+
+                if lst[i][2] > best_ho:
+                    best_ho = lst[i][2]
+                    ho_epoch = i
+
+            results.append((best_em,em_epoch, best_hm,hm_epoch, best_ho,ho_epoch))
+
+        write_string = ''
+        names = ['Train','Validation','Test']
+        res_names = ['exact match','head match','head overlap']
+        for i in range(len(names)):
+            write_string += '%s results: lowest error = %0.2f at epoch %d\n'%(names[i],errors[i][0],errors[i][1])
+            for j in range(len(res_names)):
+                write_string += '\tBest %s = %0.2f at epoch %d\n'%(res_names[j],results[i][j*2],results[i][(j*2)+1])
+
+        with open(destination+'.txt','w') as f:
+            f.write(write_string)
+
+        np.save(destination+'.npy', np.array([self.train_err,self.val_err,self.test_err,
+                                             self.train_results,self.val_results,self.test_results]))
 
     def save_imported_data(self, name=''):
         print 'Saving the data...'
@@ -584,6 +682,14 @@ if __name__ == '__main__':
 
 
 ACL DEADLINE = MARCH 18TH
+
+WHAT IS TO BE DONE:
+0) fix the graphs so that we know exactly what features we are looking at - there was no error
+1) Baseline results (essentially just graph the most recent VP behind the trigger)
+2) Implement HEAD MATCH/exact/overlap to add to the results analysis to have a better way to compare - DONE
+3) look at the Hardt paper and see what he does.
+4) why is our system working well? See how performance changes w.r.t. with/without word2vec features, alignment features etc.
+5) run vpe detection with normalized features and an SVM
 
 """
 

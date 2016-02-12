@@ -4,6 +4,7 @@ import word_characteristics as wc
 import random
 import os
 from detect_antecedents import AntecedentClassifier
+from sys import argv
 
 # Purpose:
 #   to make an exhaustive list of hyperparameter combinations.
@@ -25,9 +26,9 @@ def completed_combos():
 
 if __name__ == '__main__':
     grid = build_grid(
-         [[10.0**i for i in range(-4,2)],
-          [10.0**i for i in range(-4,0)] + [0.99],
-          [10,15,20]]
+         [[0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0],
+          [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0],
+          [int(argv[1])]]
     )
     completed = completed_combos() 
 
@@ -45,6 +46,7 @@ if __name__ == '__main__':
 
             a.fit(epochs=100, k=combo[2])
             a.make_graphs(name)
+            a.log_results(name)
             np.save('saved_weights/'+name, np.array(a.W_avg))
 
             a.reset()
