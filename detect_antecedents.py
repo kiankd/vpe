@@ -413,8 +413,8 @@ class AntecedentClassifier:
 
                 best_ant = self.bestk_ants(trigger, self.W_avg, k=1)[0]
                 # print 'Best_ant sentnum = %d, start,end = %d,%d:'%(best_ant.sentnum,best_ant.start,best_ant.end),
-                print 'Best ant: start %d, end %d, trigger wordnum %d: ',best_ant%(best_ant.start, best_ant.end, best_ant.trigger.wordnum)
-
+                print 'Best ant: start %d, end %d, trigger wordnum %d: '%(best_ant.start, best_ant.end, best_ant.trigger.wordnum)
+                print best_ant
                 self.diffs.append(np.mean((self.W_avg-self.W_old)**2))
                 print 'Difference btwen avg vector w_old: %0.6f'%(self.diffs[-1])
         self.train_results = np.array(self.train_results)
