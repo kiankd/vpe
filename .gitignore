@@ -7,3 +7,7 @@ __pychache__
 tests/post_changes/broken
 old/
 old/*
+tests/
+ant_results/
+saved_weights/
+first_tests.zip
