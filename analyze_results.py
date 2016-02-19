@@ -42,7 +42,7 @@ def bestn(n, param1, param2, lst, name, comp='greater'):
 def load_data():
     results = {}
     for fname in os.listdir(RESULTS_DIR):
-        if fname.endswith('.npy'):
+        if fname.endswith('.npy') and not fname.startswith('schedule'):
             arr = np.load(RESULTS_DIR+fname)
 
             train_err = np.array(arr[0])

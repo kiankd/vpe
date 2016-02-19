@@ -25,7 +25,7 @@ def shuffle(list_):
     return list_
 
 class AntecedentClassifier:
-    SCHEDULE_FREQUENCY = 4
+    SCHEDULE_FREQUENCY = 10
 
     def __init__(self, train_start, train_end, val_start, val_end, test_start, test_end, learn_rate=lambda x: 1.0/(x+1), C=1.0):
         self.sentences = vpe.AllSentences()
@@ -649,14 +649,14 @@ if __name__ == '__main__':
         K = 5
         name = 'schedule%d_c0.5_lr0.05_k5'%sched
 
-        a.C = 0.5
+        a.C = 0.1
         a.learn_rate = lambda x: 0.05
 
         a.fit(epochs=100, k=K, verbose=True, c_schedule=float(sched))
         a.make_graphs(name)
         a.log_results(name)
         a.reset()
-        a.initialize(seed=9001)
+        a.initialize_weights(seed=9001)
 
         np.save('saved_weights/'+name, np.array(a.W_avg))
 
