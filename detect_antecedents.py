@@ -25,7 +25,7 @@ def shuffle(list_):
     return list_
 
 class AntecedentClassifier:
-    SCHEDULE_FREQUENCY = 4
+    SCHEDULE_FREQUENCY = 10
 
     def __init__(self, train_start, train_end, val_start, val_end, test_start, test_end, learn_rate=lambda x: 1.0/(x+1), C=1.0):
         self.sentences = vpe.AllSentences()
