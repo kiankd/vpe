@@ -25,6 +25,8 @@ def shuffle(list_):
     return list_
 
 class AntecedentClassifier:
+    SCHEDULE_FREQUENCY = 4
+
     def __init__(self, train_start, train_end, val_start, val_end, test_start, test_end, learn_rate=lambda x: 1.0/(x+1), C=1.0):
         self.sentences = vpe.AllSentences()
         self.annotations = vpe.Annotations()
@@ -380,7 +382,7 @@ class AntecedentClassifier:
                                                                                            min(length_list),
                                                                                            max(length_list))
 
-    def fit(self, epochs=5, verbose=True, k=5, features_to_analyze=5):
+    def fit(self, epochs=5, verbose=True, k=5, features_to_analyze=5, c_schedule=1.0):
         # ws = [copy(self.W_old)]
         i=0
         for n in range(epochs):
@@ -391,6 +393,9 @@ class AntecedentClassifier:
                 self.W_avg = ((1.0-self.learn_rate(i)) * self.W_avg) + (self.learn_rate(i) * self.W_old) # Running average.
                 self.analyze(self.W_avg, features_to_analyze)
                 i+=1
+
+            if n % self.SCHEDULE_FREQUENCY == 0:
+                self.C /= c_schedule
 
             if verbose and n>0:
                 train_preds = self.predict(self.train_triggers)
@@ -621,43 +626,43 @@ if __name__ == '__main__':
 
     start_time = time.clock()
 
-    if not debug:
-        a = AntecedentClassifier(0,0, None,None, None,None, C=0.075, learn_rate=lambda x: 0.0001)
-        print 'We missed %d vpe instances.'%a.missed_vpe
-        initial_weights = None
+    # if not debug:
+    #     a = AntecedentClassifier(0,0, None,None, None,None, C=0.075, learn_rate=lambda x: 0.0001)
+    #     print 'We missed %d vpe instances.'%a.missed_vpe
+    #     initial_weights = None
+    #
+    #     a.initialize(pos_tests, W=initial_weights, test=0, delete_random=0,
+    #              save=False, load=False, update=False, seed=2384834)
+    #
+    # else:
+    #     a = AntecedentClassifier(0,0, None,None, None,None)
+    #     print 'Debugging...'
+    #     a.initialize(pos_tests, save=False, load=False, update=False, seed=2384834)
+    #     # a.debug_ant_selection(verbose=False)
+    #     a.debug_alignment(verbose=False)
+    #     exit(0)
 
-        a.initialize(pos_tests, W=initial_weights, test=0, delete_random=0,
-                 save=False, load=False, update=False, seed=2384834)
+    a = AntecedentClassifier(0,14, 15,19, 20,24)
+    a.initialize(['VP', wc.is_adjective, wc.is_verb], seed=9001, save=False, load=True, update=False)
 
-    else:
-        a = AntecedentClassifier(0,0, None,None, None,None)
-        print 'Debugging...'
-        a.initialize(pos_tests, save=False, load=False, update=False, seed=2384834)
-        # a.debug_ant_selection(verbose=False)
-        a.debug_alignment(verbose=False)
-        exit(0)
+    for sched in [2,5,10]:
+        K = 5
+        name = 'schedule%d_c0.5_lr0.05_k5'%sched
 
-    # for trig in a.train_triggers:
-    #     print '--------------------------------------------'
-    #     print 'TRIGGER',trig
-    #     print a.sentences.get_sentence(trig.sentnum)
-    #     # print a.sentences.get_sentence(trig.sentnum).dependencies
-    #     print 'ANTECEDENT:',trig.gold_ant
-    #     print a.sentences.get_sentence(trig.gold_ant.sentnum)
-    # print '---------'
+        a.C = 0.5
+        a.learn_rate = lambda x: 0.05
 
-    K = 5
-    name = 'full_dataset_c075_l0001_k5'
-
-    try:
-        a.fit(epochs=500, k=K, verbose=True)
+        a.fit(epochs=100, k=K, verbose=True, c_schedule=float(sched))
         a.make_graphs(name)
-    except KeyboardInterrupt:
-        a.make_graphs(name)
-        print 'Time taken: %0.2f'%(time.clock() - start_time)
+        a.log_results(name)
+        a.reset()
+        a.initialize(seed=9001)
+
+        np.save('saved_weights/'+name, np.array(a.W_avg))
 
     print 'Time taken: %0.2f'%(time.clock() - start_time)
-    np.save('weights_c075_l0001_k5', np.array(a.W_avg))
+
+
 
 """
 
@@ -684,7 +689,7 @@ if __name__ == '__main__':
 ACL DEADLINE = MARCH 18TH
 
 WHAT IS TO BE DONE:
-0) fix the graphs so that we know exactly what features we are looking at - there was no error
+0) fix the graphs so that we know exactly what features we are looking at - there was no error DONE
 1) Baseline results (essentially just graph the most recent VP behind the trigger)
 2) Implement HEAD MATCH/exact/overlap to add to the results analysis to have a better way to compare - DONE
 3) look at the Hardt paper and see what he does.
