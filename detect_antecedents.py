@@ -643,20 +643,20 @@ if __name__ == '__main__':
     #     exit(0)
 
     a = AntecedentClassifier(0,14, 15,19, 20,24)
-    a.initialize(['VP', wc.is_adjective, wc.is_verb], seed=9001, save=False, load=True, update=False)
-
+    a.initialize(['VP', wc.is_adjective, wc.is_verb], seed=9001, save=True, load=False, update=False)
+    exit(0)
     for sched in [2,5,10]:
         K = 5
         name = 'schedule%d_c0.5_lr0.05_k5'%sched
 
-        a.C = 0.5
+        a.C = 0.1
         a.learn_rate = lambda x: 0.05
 
         a.fit(epochs=100, k=K, verbose=True, c_schedule=float(sched))
         a.make_graphs(name)
         a.log_results(name)
         a.reset()
-        a.initialize(seed=9001)
+        a.initialize_weights(seed=9001)
 
         np.save('saved_weights/'+name, np.array(a.W_avg))
 
