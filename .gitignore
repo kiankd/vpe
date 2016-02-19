@@ -11,3 +11,6 @@ tests/
 ant_results/
 saved_weights/
 first_tests.zip
+old/
+old/*
+old/*.pyc
