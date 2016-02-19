@@ -42,6 +42,31 @@ def ant_trigger_relationship(ant, trigger, sentences, all_tags):
         val = numpy.dot(ant_np, trig_np) / (numpy.linalg.norm(ant_np) * numpy.linalg.norm(trig_np))
 
     v.append(val)
+
+    # Comparing the word that comes before the antecedent to the trigger word.
+    if ant.start != 0:
+        v.append(1.0)
+        v.append(1.0 if sentences[ant.sentnum].words[ant.start-1] == trigger.word else 0.0)
+        v.append(1.0 if sentences[ant.sentnum].lemmas[ant.start-1] == trigger.lemma else 0.0)
+        v.append(1.0 if sentences[ant.sentnum].pos[ant.start-1] == trigger.pos else 0.0)
+    else:
+        v += [0.0, 0.0, 0.0, 0.0, 0.0]
+
+    # Comparing the word that comes before the trigger to the word that comes before the antecedent.
+    if trigger.wordnum != 0 and ant.start != 0:
+        v.append(1.0)
+
+        v.append(1.0 if sentences[ant.sentnum].words[ant.start-1] ==
+            sentences[trigger.sentnum].words[trigger.wordnum-1] else 0.0)
+
+        v.append(1.0 if sentences[ant.sentnum].lemmas[ant.start-1] ==
+            sentences[trigger.sentnum].lemmas[trigger.wordnum-1] else 0.0)
+
+        v.append(1.0 if sentences[ant.sentnum].pos[ant.start-1] ==
+            sentences[trigger.sentnum].pos[trigger.wordnum-1] else 0.0)
+    else:
+        v += [0.0, 0.0, 0.0, 0.0]
+
     return v
 
 def nearest_trig_np(trig, sentences, all_tags):

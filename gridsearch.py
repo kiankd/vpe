@@ -43,7 +43,7 @@ if __name__ == '__main__':
             print "Current Params: ",combo
             a.C = combo[0]
             a.learn_rate = lambda x: combo[1]
-            name = 'grid2_c%s_lr%s_k%s_'%(combo[0], combo[1], combo[2])
+            name = 'NEWFEATURES_c%s_lr%s_k%s_'%(combo[0], combo[1], combo[2])
 
             a.fit(epochs=100, k=combo[2])
             a.make_graphs(name)

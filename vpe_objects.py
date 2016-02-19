@@ -67,6 +67,9 @@ class AllSentences:
     def __len__(self):
         return len(self.sentences)
 
+    def __getitem__(self, item):
+        return self.get_sentence(item)
+
     def add_mrg(self, mrg_matrix):
         for sentdict in mrg_matrix:
             self.sentences.append(sentdict)

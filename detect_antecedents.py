@@ -645,14 +645,14 @@ if __name__ == '__main__':
     a = AntecedentClassifier(0,14, 15,19, 20,24)
     a.initialize(['VP', wc.is_adjective, wc.is_verb], seed=9001, save=True, load=False, update=False)
     exit(0)
-    for sched in [2,5,10]:
+    for lr in [0.01, 0.05, 0.1, 0.5]:
         K = 5
-        name = 'schedule%d_c0.5_lr0.05_k5'%sched
+        name = 'NEWFEATURES%d_c0.1_lr%s_k5'%(sched,lr)
 
         a.C = 0.1
-        a.learn_rate = lambda x: 0.05
+        a.learn_rate = lambda x: lr
 
-        a.fit(epochs=100, k=K, verbose=True, c_schedule=float(sched))
+        a.fit(epochs=100, k=K, verbose=True)
         a.make_graphs(name)
         a.log_results(name)
         a.reset()
