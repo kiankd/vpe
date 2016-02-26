@@ -134,7 +134,7 @@ def myfeaturesvector(sentdict, idx, features):
 
     tree = NT.maketree(sentdict['tree'][0])
     subtrees = NT.getsmallestsubtrees(tree)
-    subtree_positions = NT.getsmallestsubtreepositions(tree, subtree_list = subtrees)
+    subtree_positions = NT.get_smallest_subtree_positions(tree, subtree_list = subtrees)
     aux = sentdict['lemmas'][idx]
 
     if 'my_features' in features:

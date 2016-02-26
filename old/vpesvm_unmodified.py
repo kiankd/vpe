@@ -465,7 +465,7 @@ def testmyrules(classifier, section_start, section_end):
                 count += 1
                 if aux_start < count <= aux_end:
                     tree = NT.maketree(sentdict['tree'][0])
-                    subtree_positions = NT.getsmallestsubtreepositions(tree)
+                    subtree_positions = NT.get_smallest_subtree_positions(tree)
                     if word in MODALS: my_rules_return_vector.append(truth(modalcheck(sentdict, i, tree, subtree_positions))) #Todo: I modified these b/c they were incorrectly written.
                     elif word in BE: my_rules_return_vector.append(truth(becheck(sentdict, i, tree, subtree_positions)))
                     elif word in HAVE: my_rules_return_vector.append(truth(havecheck(sentdict, i, tree, subtree_positions)))

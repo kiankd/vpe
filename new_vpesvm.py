@@ -186,7 +186,7 @@ class VPEDetectionClassifier:
             aux = self.all_auxiliaries.get_aux(i)
             sendict = self.sentences.get_sentence(aux.sentnum)
             tree = sendict.get_nltk_tree()
-            word_subtree_positions = nt.getsmallestsubtreepositions(tree)
+            word_subtree_positions = nt.get_smallest_subtree_positions(tree)
 
             if not original_rules:
                 if aux.type == 'modal': self.predictions.append(vc.bool_to_int(wc.modal_rule(sendict, aux, tree, word_subtree_positions)))

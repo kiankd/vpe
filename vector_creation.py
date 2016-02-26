@@ -122,7 +122,7 @@ def aux_pos_bigrams_vector(sentdict, aux, pos_bigrams):
 def linguistic_features_vector(sentdict, aux, features):
     vector = []
     tree = sentdict.get_nltk_tree()
-    subtree_positions = nt.getsmallestsubtreepositions(tree)
+    subtree_positions = nt.get_smallest_subtree_positions(tree)
 
     if 'my_features' in features:
         vector += my_features_vector(sentdict, aux, tree, subtree_positions)

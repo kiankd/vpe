@@ -104,7 +104,7 @@ def aux_ccommanded_by_verb(sentdict, aux, tree, word_positions_in_tree):
 
 def aux_locally_ccommanded_by_verb(sentdict, aux, tree, word_positions_in_tree):
     try:
-        localt = nt.generatelocalstructurefromsubtree(tree, tree[word_positions_in_tree[aux.wordnum-1]])
+        localt = nt.generate_local_structure_from_subtree(tree, tree[word_positions_in_tree[aux.wordnum-1]])
         local_word_subtrees =  nt.getsmallestsubtrees(localt)
 
         for subtree in local_word_subtrees:
@@ -117,7 +117,7 @@ def aux_locally_ccommanded_by_verb(sentdict, aux, tree, word_positions_in_tree):
 
 def aux_locally_ccommands_verb(sentdict, aux, tree, word_positions_in_tree):
     try:
-        localt = nt.generatelocalstructurefromsubtree(tree, tree[word_positions_in_tree[aux.wordnum-1]])
+        localt = nt.generate_local_structure_from_subtree(tree, tree[word_positions_in_tree[aux.wordnum-1]])
         local_word_subtrees = nt.getsmallestsubtrees(localt)
 
         for subtree in local_word_subtrees:
@@ -229,7 +229,7 @@ def do_rule(sentdict, aux, tree, word_positions_in_tree):
     if not aux_locally_ccommanded_by_verb(sentdict, aux, tree, word_positions_in_tree):
         if to_precedes_aux(sentdict, aux): return False
 
-        localt = nt.generatelocalstructurefromsubtree(tree, tree[word_positions_in_tree[auxidx-1]])
+        localt = nt.generate_local_structure_from_subtree(tree, tree[word_positions_in_tree[auxidx-1]])
         local_word_subtrees = nt.getsmallestsubtrees(localt)
 
         try:

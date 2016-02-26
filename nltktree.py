@@ -2,6 +2,9 @@ import nltk
 import copy
 # This program is used to do everything I need to do with the nltk.
 
+class NoVPException:
+    def __init__(self): pass
+
 # Makes the nltk tree from a string passed to it.
 def maketree(tree_string):
     t = nltk.ParentedTree.fromstring(tree_string)
@@ -78,7 +81,7 @@ def hasadverb(subtree):
                 return True
     return False
 
-def generatelocalstructurefromsubtree(t, subtree):
+def generate_local_structure_from_subtree(t, subtree):
     SENTENCE_PHRASES = ['S', 'SBAR', 'SQ', 'SBARQ','SINV']
 
     crt = subtree
@@ -122,7 +125,7 @@ def getsmallestsubtrees(t):
 def pos_word_tuples(t):
     return [(subtree.label(),subtree[0]) for subtree in t.subtrees(lambda t: t.height() == 2)]
 
-def getsmallestsubtreepositions(t, subtree_list = None):
+def get_smallest_subtree_positions(t, subtree_list = None):
     subtree_positions = []
     if not subtree_list:
         for subtree in t.subtrees(lambda t: t.height() == 2):
@@ -132,9 +135,8 @@ def getsmallestsubtreepositions(t, subtree_list = None):
             subtree_positions.append(subtree.treeposition())
     return subtree_positions
 
-
 def lowest_common_subtree(t, word_list):
-    positions = getsmallestsubtreepositions(t)
+    positions = get_smallest_subtree_positions(t)
 
     head_idx = 0
     head = word_list[head_idx]
@@ -196,7 +198,7 @@ def get_phrase_length(t):
     return get_phrase_length.length
 
 def get_nearest_phrase(t, idx, phrases):
-    positions = getsmallestsubtreepositions(t)
+    positions = get_smallest_subtree_positions(t)
     try:
         crt_node = t[positions[idx-1]]
     except IndexError:
@@ -213,7 +215,7 @@ def get_nearest_phrase(t, idx, phrases):
     return crt_node
 
 def get_nearest_vp(t, idx):
-    positions = getsmallestsubtreepositions(t)
+    positions = get_smallest_subtree_positions(t)
     crt_node = t[positions[idx-1]]
 
     while crt_node.label() != 'VP' and crt_node.label() != 'SINV': # TODO: maybe change this to just VP!
@@ -225,6 +227,30 @@ def get_nearest_vp(t, idx):
         crt_node = crt_node.parent()
 
     return crt_node
+
+def get_nearest_vp_exceptional(t, idx, trigger):
+    vps = []
+    def find_vps_recursive(tree): # Need to save indexes of the VPs
+        for child in tree:
+            if type(child) != str:
+                if child.label() == 'VP':
+                    vps.append(child)
+                find_vps_recursive(child)
+    find_vps_recursive(t)
+
+    if len(vps) >= 1:
+        trig_idx = getsmallestsubtrees(t)[trigger.wordnum-1].treeposition()
+        for vp in vps:
+            if vp.treeposition() >= trig_idx[:-1]: # Don't include the last 0
+                vps.remove(vp) # Get rid of VPs that include the trigger
+
+        if len(vps) == 0:
+            raise NoVPException
+
+        return t[max([vp.treeposition() for vp in vps])] # Return the right-most VP
+
+    if len(vps) == 0:
+        raise NoVPException
 
 # def get_closest_constituent(t, word_list):
 #     head_idx = 0
@@ -263,7 +289,3 @@ def printfrompositions(t, tree_pos_list):
     for pos in tree_pos_list:
         print t[pos],
     print '\n'
-
-
-
-

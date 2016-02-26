@@ -80,6 +80,25 @@ class AllSentences:
         """
         return self.sentences[i]
 
+    def nearest_vp(self, trigger):
+        """Returns an antecedent that represents the VP that is nearest to the trigger on the left."""
+        vp = None
+        sent = None
+        try:
+            vp = nt.get_nearest_vp_exceptional(self.get_sentence_tree(trigger.sentnum), trigger.wordnum-1, trigger) # Go behind trigger.
+            sent = trigger.sentnum
+        except nt.NoVPException:
+            for sentnum in reversed(range(trigger.sentnum-2, trigger.sentnum)):
+                try:
+                    vp = nt.get_nearest_vp_exceptional(self.get_sentence_tree(sentnum), len(self[sentnum])-2, trigger)
+                    sent = sentnum
+                except nt.NoVPException:
+                    continue
+
+        assert vp != None
+
+        return
+
     def set_possible_ants(self, trigger, pos_tests):
         for sentnum in range(max(0, trigger.sentnum - SENTENCE_SEARCH_DISTANCE), trigger.sentnum+1):
             functions = [f for f in pos_tests if hasattr(f, '__call__')]
@@ -149,7 +168,6 @@ class AllSentences:
                             # print 'added poss_ant: %d to %d'%(leaves_dict[start], leaves_dict[end]+1),trigger.possible_ants[-1]
 
                     # raise Finished()
-
 
     def idxs_to_ant(self, sentnum, start, end, trigger):
         sentdict = self.sentences[sentnum]
@@ -633,6 +651,7 @@ class Auxiliary:
         elif lemma in SO: return 'so'
         else:
             raise AuxiliaryHasNoTypeException(lemma)
+
 
 class RawAuxiliary:
     """ Only exists for extracting the annotations from the raw XML files. """

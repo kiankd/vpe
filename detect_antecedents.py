@@ -615,6 +615,22 @@ class AntecedentClassifier:
         self.val_triggers = data[2]
         self.test_triggers = data[3]
 
+    def set_trigger_type(self, type_):
+        """
+        We use this if we want to see how the algorithm performs when it only trains and tests
+        on one type of trigger, i.e. "do".
+        """
+        assert type_ in ['modal', 'be', 'have', 'do', 'to', 'so']
+        self.train_triggers = [trig for trig in self.train_triggers if trig.type == type_]
+        self.val_triggers = [trig for trig in self.val_triggers if trig.type == type_]
+        self.test_triggers = [trig for trig in self.test_triggers if trig.type == type_]
+
+    def baseline_prediction(self):
+        """Baseline algorithm that only considers nearest VP."""
+        train_ant_pred = [self.sentences.nearest_vp(trig) for trig in self.train_triggers]
+        val_ant_pred = [self.sentences.nearest_vp(trig) for trig in self.val_triggers]
+        test_ant_pred = [self.sentences.nearest_vp(trig) for trig in self.test_triggers]
+
 if __name__ == '__main__':
     pos_tests = ['VP', wc.is_adjective, wc.is_verb]
 
@@ -623,6 +639,12 @@ if __name__ == '__main__':
     except IndexError:
         debug = False
         pass
+
+    if debug:
+        a = AntecedentClassifier(0,0, None,None, None,None, C=0.075, learn_rate=lambda x: 0.0001)
+        a.initialize(pos_tests, save=False, load=True, update=False, seed=2384834)
+        a.baseline_prediction()
+        exit(0)
 
     start_time = time.clock()
 
@@ -643,11 +665,11 @@ if __name__ == '__main__':
     #     exit(0)
 
     a = AntecedentClassifier(0,14, 15,19, 20,24)
-    a.initialize(['VP', wc.is_adjective, wc.is_verb], seed=9001, save=True, load=False, update=False)
-    exit(0)
+    a.initialize(['VP', wc.is_adjective, wc.is_verb], seed=9001, save=False, load=True, update=False)
+    a.set_trigger_type('do')
     for lr in [0.01, 0.05, 0.1, 0.5]:
         K = 5
-        name = 'NEWFEATURES%d_c0.1_lr%s_k5'%(sched,lr)
+        name = 'DO_c0.1_lr%s_k5'%(lr)
 
         a.C = 0.1
         a.learn_rate = lambda x: lr
@@ -696,9 +718,12 @@ WHAT IS TO BE DONE:
 4) why is our system working well? See how performance changes w.r.t. with/without word2vec features, alignment features etc.
 5) run vpe detection with normalized features and an SVM
 
+
+0) Analyze results with respect to the type of trigger that we are considering. i.e. DO and not DO SO
+
+BASELINE!!!!!!!!!!!!!!!
+
 """
-
-
 
 
 

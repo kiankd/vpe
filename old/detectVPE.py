@@ -299,7 +299,7 @@ def auxccommandsverb(sentdict, auxidx, t, word_positions_in_tree):
 # Returns true if the auxiliary is ASYMETRICALLY c-commanded by a verb in the local structure.
 def auxislocallyccommandedbyverb(sentdict, auxidx, t, word_positions_in_tree):
     try:
-        localt = nltktree.generatelocalstructurefromsubtree(t, t[word_positions_in_tree[auxidx-1]])
+        localt = nltktree.generate_local_structure_from_subtree(t, t[word_positions_in_tree[auxidx-1]])
         local_word_subtrees = nltktree.getsmallestsubtrees(localt)
 
         for subtree in local_word_subtrees:
@@ -313,7 +313,7 @@ def auxislocallyccommandedbyverb(sentdict, auxidx, t, word_positions_in_tree):
 # Returns true if the auxiliary ASYMETRICALLY c-commands a verb.
 def auxlocallyccommandsverb(sentdict, auxidx, t, word_positions_in_tree):
     try:
-        localt = nltktree.generatelocalstructurefromsubtree(t, t[word_positions_in_tree[auxidx-1]])
+        localt = nltktree.generate_local_structure_from_subtree(t, t[word_positions_in_tree[auxidx-1]])
         local_word_subtrees = nltktree.getsmallestsubtrees(localt)
 
         for subtree in local_word_subtrees:
@@ -393,7 +393,7 @@ def auxiliarycheck(sentdict, auxidx, verbose):
 
 
 def nexttopunct(sentdict, auxidx, t, word_positions_in_tree):
-    localt = nltktree.generatelocalstructurefromsubtree(t, t[word_positions_in_tree[auxidx-1]])
+    localt = nltktree.generate_local_structure_from_subtree(t, t[word_positions_in_tree[auxidx-1]])
     local_word_subtrees = nltktree.getsmallestsubtrees(localt)
     try:
         checkpuncttag = sentdict['pos'][auxidx+1]
@@ -482,7 +482,7 @@ def docheck(sentdict, auxidx, t, word_positions_in_tree, verbose=False):
 
         if toprecedesaux(sentdict, auxidx): return False
 
-        localt = nltktree.generatelocalstructurefromsubtree(t, t[word_positions_in_tree[auxidx-1]])
+        localt = nltktree.generate_local_structure_from_subtree(t, t[word_positions_in_tree[auxidx-1]])
         local_word_subtrees = nltktree.getsmallestsubtrees(localt)
 
         # Do at the end of sentence.
