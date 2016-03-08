@@ -45,7 +45,8 @@ def alignment_matrix(sentences, trigger, word2vec_dict, dep_names=('prep','adv',
 
         ant.x = np.array([1] + alignment_vector(mapping, untrigs, unants, dep_names, word2vec_dict, verbose=False)
                              + relational_vector(trigger, ant)
-                             + avc.ant_trigger_relationship(ant, trigger, sentences, pos_tags))
+                             + avc.ant_trigger_relationship(ant, trigger, sentences, pos_tags)
+                             + hardt_features(ant, trigger, sentences))
 
     # print 'Avg mapping, trig_chunks, ant_chunks lengths: %0.2f, %d, %0.2f'\
     #       %(np.mean(MAPPING_LENGTHS), len(trig_chunks),np.mean(ANT_CHUNK_LENGTHS))
@@ -53,6 +54,30 @@ def alignment_matrix(sentences, trigger, word2vec_dict, dep_names=('prep','adv',
     ANT_CHUNK_LENGTHS = []
     MAPPING_LENGTHS = []
     return
+
+def hardt_features(ant, trig, sentences):
+    """
+        This exists to add features that are based on what Hardt did in 1997.
+        @type ant: vpe_objects.Antecedent
+    """
+    v = []
+
+    vp = sentences.nearest_vp(trig)
+    vp_head = vp.get_head()
+    vp_head_idx = vp.get_head(idx=True)
+
+    ant_head = ant.get_head()
+    ant_head_idx = ant.get_head(idx=True)
+
+    v.append(1.0 if ant == vp else 0.0)
+    v.append(1.0 if ant_head == vp_head else 0.0)
+    v.append(1.0 if vp.start <= ant_head_idx <= vp.end else 0.0)
+    v.append(1.0 if ant.start <= vp_head_idx <= ant.end else 0.0)
+    v.append(ant.sentnum - vp.sentnum)
+    v.append(ant.start - vp.start)
+    v.append(ant.end - vp.end)
+
+    return v
 
 def relational_vector(trig, ant):
     """

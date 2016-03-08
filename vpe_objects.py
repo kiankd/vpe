@@ -81,7 +81,10 @@ class AllSentences:
         return self.sentences[i]
 
     def nearest_vp(self, trigger):
-        """Returns an antecedent that represents the VP that is nearest to the trigger on the left."""
+        """
+            Returns an antecedent that represents the VP that is nearest to the trigger on the left.
+            @type return: Antecedent
+        """
         vp = None
         sent = None
         try:
@@ -680,6 +683,11 @@ class Antecedent:
             ret += w+' '
         return ret
 
+    def __eq__(self, other):
+        if type(other) != type(self):
+            return False
+        return self.sentnum == other.sentnum and self.start == other.start and self.end == other.end
+
     def contains_trigger(self):
         if self.sentnum != self.trigger.sentnum:
             return False
@@ -701,11 +709,21 @@ class Antecedent:
     def get_words(self):
         return self.sub_sentdict.words
 
-    def get_head(self):
+    def get_head(self, idx=False):
+        """
+        @type return: str
+        """
         for i in range(len(self.sub_sentdict.words)):
             if wc.is_verb(self.sub_sentdict.pos[i]) and not wc.is_aux_lemma(self.sub_sentdict.lemmas[i]):
-                return self.sub_sentdict.words[i]
-        return self.sub_sentdict.words[0]
+                if idx:
+                    return i
+                else:
+                    return self.sub_sentdict.words[i]
+
+        if idx:
+            return 0
+        else:
+            return self.sub_sentdict.words[0]
 
 class RawAntecedent:
     """ Only exists for extracting the annotations from the raw XML files. """

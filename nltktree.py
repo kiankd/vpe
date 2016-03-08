@@ -215,6 +215,7 @@ def get_nearest_phrase(t, idx, phrases):
     return crt_node
 
 def get_nearest_vp(t, idx):
+    """DEPRECATED"""
     positions = get_smallest_subtree_positions(t)
     crt_node = t[positions[idx-1]]
 
