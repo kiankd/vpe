@@ -279,7 +279,8 @@ class AntecedentClassifier:
                 f.write('Antecedent: %s\n'%trigger.gold_ant.__repr__())
                 f.write('Tree:\n%s'%self.sentences.get_sentence_tree(trigger.sentnum).__repr__())
 
-        s = ['\nMissed this many gold possible ants: %d'%missed,
+        s = ['Total ants: %d'%sum(lengths),
+            '\nMissed this many gold possible ants: %d'%missed,
             'That is %0.2f percent.'%(float(missed)/total),
             'Average length of possible ants: %d'%np.mean(lengths),
              'Min/Max lengths: %d, %d\n'%(min(lengths),max(lengths))]
@@ -393,7 +394,6 @@ class AntecedentClassifier:
                 self.W_avg = ((1.0-self.learn_rate(i)) * self.W_avg) + (self.learn_rate(i) * self.W_old) # Running average.
                 self.analyze(self.W_avg, features_to_analyze)
                 i+=1
-
             if n % self.SCHEDULE_FREQUENCY == 0:
                 self.C /= c_schedule
 
@@ -475,13 +475,17 @@ class AntecedentClassifier:
             antwords = ant.sub_sentdict.words
             goldwords = gold.sub_sentdict.words
 
-            em = antwords == goldwords
-            hm = antwords[0] == goldwords[0]
-            ho = antwords[0] in goldwords
+            if len(antwords) > 0:
+                em = antwords == goldwords
+                hm = ant.get_head() == gold.get_head()
+                ho = gold.get_head() in antwords
 
-            if em: exact_match += 1
-            if hm: head_match += 1
-            if ho: head_overlap += 1
+            if em:
+                exact_match += 1
+            if hm:
+                head_match += 1
+            if ho:
+                head_overlap += 1
 
         exact_match /= float(len(predictions))
         head_match /= float(len(predictions))
@@ -625,11 +629,18 @@ class AntecedentClassifier:
         self.val_triggers = [trig for trig in self.val_triggers if trig.type == type_]
         self.test_triggers = [trig for trig in self.test_triggers if trig.type == type_]
 
+        print len(self.train_triggers), len(self.val_triggers), len(self.test_triggers)
+
     def baseline_prediction(self):
         """Baseline algorithm that only considers nearest VP."""
         train_ant_pred = [self.sentences.nearest_vp(trig) for trig in self.train_triggers]
         val_ant_pred = [self.sentences.nearest_vp(trig) for trig in self.val_triggers]
         test_ant_pred = [self.sentences.nearest_vp(trig) for trig in self.test_triggers]
+
+        print 'Baseline results:'
+        print '\tTrain: ',self.criteria_based_results(train_ant_pred)
+        print '\tVal: ',self.criteria_based_results(val_ant_pred)
+        print '\tTest: ',self.criteria_based_results(test_ant_pred)
 
 if __name__ == '__main__':
     pos_tests = ['VP', wc.is_adjective, wc.is_verb]
@@ -640,15 +651,17 @@ if __name__ == '__main__':
         debug = False
         pass
 
-    if debug:
-        a = AntecedentClassifier(0,0, None,None, None,None, C=0.075, learn_rate=lambda x: 0.0001)
-        a.initialize(pos_tests, save=False, load=True, update=False, seed=2384834)
-        a.baseline_prediction()
-        exit(0)
+    # if debug:
+    #     a = AntecedentClassifier(0,14, 15,19, 20,24, C=0.075, learn_rate=lambda x: 0.0001)
+    #     a.initialize(pos_tests, save=False, load=True, update=False, seed=2384834)
+    #     a.set_trigger_type("do")
+    #     a.baseline_prediction()
+    #     exit(0)
 
     start_time = time.clock()
 
-    # if not debug:
+    if not debug:
+        pass
     #     a = AntecedentClassifier(0,0, None,None, None,None, C=0.075, learn_rate=lambda x: 0.0001)
     #     print 'We missed %d vpe instances.'%a.missed_vpe
     #     initial_weights = None
@@ -656,13 +669,20 @@ if __name__ == '__main__':
     #     a.initialize(pos_tests, W=initial_weights, test=0, delete_random=0,
     #              save=False, load=False, update=False, seed=2384834)
     #
-    # else:
-    #     a = AntecedentClassifier(0,0, None,None, None,None)
-    #     print 'Debugging...'
-    #     a.initialize(pos_tests, save=False, load=False, update=False, seed=2384834)
-    #     # a.debug_ant_selection(verbose=False)
-    #     a.debug_alignment(verbose=False)
-    #     exit(0)
+    else:
+        a = AntecedentClassifier(0,14, None,None, None,None)
+        print 'Debugging...'
+        a.initialize(pos_tests, save=False, load=True, update=False, seed=2384834)
+
+        for trig in a.train_triggers:
+            ant = trig.gold_ant
+            print '---------------------'
+            print a.sentences.get_sentence_tree(ant.sentnum)
+            print ant.sub_sentdict
+
+        a.debug_ant_selection(verbose=False)
+        # a.debug_alignment(verbose=False)
+        exit(0)
 
     a = AntecedentClassifier(0,14, 15,19, 20,24)
     a.initialize(['VP', wc.is_adjective, wc.is_verb], seed=9001, save=False, load=True, update=False)
@@ -722,6 +742,11 @@ WHAT IS TO BE DONE:
 0) Analyze results with respect to the type of trigger that we are considering. i.e. DO and not DO SO
 
 BASELINE!!!!!!!!!!!!!!!
+
+# Add Hardt features!
+# Test changing Loss function to say 0% if there is NO head in the proposed ant (hard constraint)
+# also can think about how we can weight diff words in loss function.
+# Make MIRA vizualization and check obj. function scoring of diff things
 
 """
 

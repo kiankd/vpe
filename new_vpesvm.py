@@ -9,11 +9,13 @@ import vpe_objects as vpe
 from file_names import Files
 from scipy.sparse import csr_matrix,vstack
 from sklearn.svm import SVC
+from sklearn.svm import LinearSVC
 from sklearn.linear_model import LogisticRegression,LogisticRegressionCV
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import StandardScaler
 from os import listdir
 from sys import argv
 
@@ -31,6 +33,7 @@ from sys import argv
 """ ---- Primary Classes and methods. ---- """
 class VPEDetectionClassifier:
     SVM = 'SVM'
+    LINEAR_SVM = 'Linear SVC'
     LOGREG = 'Logistic regression'
     NAIVE_BAYES = 'Naive Bayes'
     LOGREGCV = 'Logistic regression CV'
@@ -66,6 +69,7 @@ class VPEDetectionClassifier:
 
     def set_classifier(self, classifier):
         if classifier==self.SVM: self.hyperplane = SVC()
+        elif classifier==self.LINEAR_SVM: self.hyperplane = LinearSVC()
         elif classifier==self.LOGREG: self.hyperplane = LogisticRegression()
         elif classifier==self.NAIVE_BAYES: self.hyperplane = MultinomialNB()
         elif classifier==self.LOGREGCV: self.hyperplane = LogisticRegressionCV()
@@ -123,7 +127,41 @@ class VPEDetectionClassifier:
                 except IndexError:
                     break
 
-    def make_feature_vectors(self, make_test_vectors=True, use_old_vectors=False):
+    def save_data_npy(self, val=False):
+        a = np.array([self.gold_standard_auxs, self.annotations, self.sentences, self.all_auxiliaries,
+                      self.train_vectors, self.train_classes, self.test_vectors, self.test_classes])
+        if val:
+            np.save('vpe_detect_data_val', a)
+        else:
+            np.save('vpe_detect_data_test', a)
+
+    def load_data_npy(self, val=False):
+        if val:
+            a = np.load('vpe_detect_data_val.npy')
+        else:
+            a = np.load('vpe_detect_data_test.npy')
+
+        self.gold_standard_auxs = a[0]
+        self.annotations = a[1]
+        self.sentences = a[2]
+        self.all_auxiliaries = a[3]
+        self.train_vectors = a[4]
+        self.train_classes = a[5]
+        self.test_vectors = a[6]
+        self.test_classes = a[7]
+
+    def normalize(self):
+        print 'Normalizing the data...'
+        s = StandardScaler(with_mean=False) # No need to do mean on sparse
+        s.fit_transform(self.vecs_to_mat(train=True))
+        s.transform(self.vecs_to_mat(train=False))
+
+    def make_feature_vectors(self, make_test_vectors=True, make_train_vectors=True, use_old_vectors=False):
+        if make_train_vectors:
+            self.train_vectors, self.train_classes = [],[]
+        if make_test_vectors:
+            self.test_vectors, self.test_classes = [],[]
+
         frequent_words = self.file_names.extract_data_from_file(self.file_names.EACH_UNIQUE_WORD_NEAR_AUX)
         all_pos = self.file_names.extract_data_from_file(self.file_names.EACH_UNIQUE_POS_FILE)
         pos_bigrams = wc.pos_bigrams(all_pos)
@@ -131,7 +169,7 @@ class VPEDetectionClassifier:
         for aux in self.all_auxiliaries:
             sentdict = self.sentences.get_sentence(aux.sentnum)
 
-            if self.start_train <= sentdict.get_section() <= self.end_train:
+            if make_train_vectors and self.start_train <= sentdict.get_section() <= self.end_train:
                 self.train_vectors.append(csr_matrix(vc.make_vector(sentdict, aux, self.features, vpe.ALL_CATEGORIES, vpe.AUX_LEMMAS, vpe.ALL_AUXILIARIES, frequent_words, all_pos, pos_bigrams, make_old=use_old_vectors)))
                 self.train_classes.append(vc.bool_to_int(aux.is_trigger))
                 if len(self.train_vectors) % 1000 == 0 or len(self.train_vectors) == 1:
@@ -165,12 +203,58 @@ class VPEDetectionClassifier:
         self.train_vectors = new_features
         self.train_classes = new_classes
 
+    def vecs_to_mat(self, train=True):
+        if train:
+            vecs = self.train_vectors
+        else:
+            vecs = self.test_vectors
+
+        m = vecs[0]
+        for i in range(1,len(vecs)):
+            m = vstack((m,vecs[i]), format='csr')
+        return m
+
     def train(self):
         print 'Training the model...'
         m = self.train_vectors[0]
         for i in range(1,len(self.train_vectors)):
             m = vstack((m,self.train_vectors[i]), format='csr')
         self.hyperplane.fit(m, np.array(self.train_classes))
+
+    def set_aux_type(self, type_):
+        # assert type_ in
+        new_train,new_test = [],[]
+        new_train_classes,new_test_classes = [],[]
+
+        for i in range(len(self.train_vectors)):
+            if self.all_auxiliaries.get_aux(i).type == type_:
+                new_train.append(self.train_vectors[i])
+                new_train_classes.append(self.train_classes[i])
+
+        for i in range(len(self.train_vectors), len(self.all_auxiliaries)):
+            if self.all_auxiliaries.get_aux(i).type == type_:
+                new_test.append(self.test_vectors[i-len(self.train_vectors)])
+                new_test_classes.append(self.test_classes[i-len(self.train_vectors)])
+
+        self.train_vectors = new_train
+        self.train_classes = new_train_classes
+        self.test_vectors = new_test
+        self.test_classes = new_test_classes
+
+    def analyze_auxs(self):
+        d = {}
+        for aux in self.all_auxiliaries:
+            if aux.is_trigger:
+                if not d.has_key(aux.type):
+                    d[aux.type] = [aux]
+                else:
+                    d[aux.type].append(aux)
+        print d.keys()
+        total = 0
+        for k in d:
+            total += len(d[k])
+            print k, len(d[k])
+        print total
 
     def test(self):
         print 'Testing the model...'
@@ -240,6 +324,12 @@ class VPEDetectionClassifier:
         result_vector += [('precision',precision),('recall',recall), ('f1',f1)]
         self.result_vector = result_vector
 
+    # def vpe_class_based_results(self):
+    #     mats = {'modal':[], 'be':[], 'do':[], 'so':[], 'to':[]}
+    #     for i in range(len(self.train_vectors),len(self.all_auxiliaries)):
+    #         aux = self.all_auxiliaries.get_aux(i)
+    #         mats[aux.type].append(self.test_vectors[i-len(self.train_vectors)])
+
     def log_results(self, file_name):
         train_length = self.pre_oversample_length
         with open(self.file_names.RESULT_LOGS_LOCATION + file_name + '.txt', 'w') as f:
@@ -267,9 +357,8 @@ if __name__ == '__main__':
     if len(argv) == 5:
         c = VPEDetectionClassifier(int(argv[1]),int(argv[2]),int(argv[3]),int(argv[4]))
     else:
-        c = VPEDetectionClassifier(0,14,20,24)
+        c = VPEDetectionClassifier(0,14,15,19)
 
-    c.import_data()
     # c.all_auxiliaries.print_gold_auxiliaries()
 
     # for a in c.gold_standard_auxs:
@@ -285,21 +374,34 @@ if __name__ == '__main__':
 
     # c.file_names.make_all_the_files(c.sentences)
 
-    c.set_features(features)
-    c.make_feature_vectors(make_test_vectors=True,use_old_vectors=False)
-    c.oversample(multiplier=5)
+    load = True
+    if not load:
+        c.import_data()
+        c.set_features(features)
+        c.make_feature_vectors(make_test_vectors=True,use_old_vectors=False)
+        c.save_data_npy(val=False)
+    else:
+        c.load_data_npy(val=True)
+        c.analyze_auxs()
+        exit(0)
 
-    c.set_classifier(c.RANDOMFOREST)
-    c.train()
-    c.test()
-    c.results('%s oversample 5'%c.RANDOMFOREST)
-    c.log_results('RANDOMFOREST_100estimators_4minsamplesleaf_all_features_old_rules_oversamplex5')
+    c.oversample(multiplier=5)
+    c.set_aux_type('so')
+    c.normalize()
+
+    # c.oversample(multiplier=5)
+
+    # c.set_classifier(c.RANDOMFOREST)
+    # c.train()
+    # c.test()
+    # c.results('%s oversample 5'%c.RANDOMFOREST)
+    # c.log_results('RANDOMFOREST_normalized_100estimators_4minsamplesleaf_all_features_old_rules_oversamplex5')
 
     c.set_classifier(c.LOGREGCV)
     c.train()
     c.test()
     c.results('%s oversample 5'%c.LOGREGCV)
-    c.log_results('logregcv_all_features_old_rules_oversamplex5')
+    c.log_results('logregcv_normalized_all_features_old_rules_oversamplex5')
 
     # c.set_classifier(c.ADABOOST)
     # c.train()
@@ -308,25 +410,31 @@ if __name__ == '__main__':
     # c.log_results('ADABOOST_500estimators_all_features_old_rules_oversamplex5')
 
     def test():
+        c.set_classifier(c.LINEAR_SVM)
+        c.train()
+        c.test()
+        c.results('%s normalized oversample 5'%c.LINEAR_SVM)
+
         c.set_classifier(c.SVM)
         c.train()
         c.test()
-        c.results('%s oversample 5'%c.SVM)
+        c.results('%s normalized oversample 5'%c.SVM)
 
         c.set_classifier(c.DECISION_TREE)
         c.train()
         c.test()
-        c.results('%s oversample 5'%c.DECISION_TREE)
+        c.results('%s normalized oversample 5'%c.DECISION_TREE)
 
         c.set_classifier(c.DECISION_TREE_WITH_OPTIONS)
         c.train()
         c.test()
-        c.results('%s oversample 5'%c.DECISION_TREE_WITH_OPTIONS)
+        c.results('%s normalized oversample 5'%c.DECISION_TREE_WITH_OPTIONS)
 
         c.set_classifier(c.NAIVE_BAYES)
         c.train()
         c.test()
-        c.results('%s oversample 5'%c.NAIVE_BAYES)
+        c.results('%s normalized oversample 5'%c.NAIVE_BAYES)
 
+    # test()
     print 'Time taken: %0.2f'%(time.clock()-start_time)
 

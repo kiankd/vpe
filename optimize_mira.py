@@ -23,7 +23,7 @@ for i in range(num_constraints):
 
 m.update()
 
-# We are optimizing the equation || w - old || = (w[i]-old[i])^2 for i in range(num_weights) = w[i]^2 - 2*w[i]*old[i]
+# We are minimizing the equation || w - old || = (w[i]-old[i])^2 for i in range(num_weights) = w[i]^2 - 2*w[i]*old[i]
 
 # w1 ^2 + w2 ^2 + ...
 obj = quicksum(w[i]*w[i] for i in range(num_weights))

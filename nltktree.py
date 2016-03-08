@@ -229,6 +229,7 @@ def get_nearest_vp(t, idx):
     return crt_node
 
 def get_nearest_vp_exceptional(t, idx, trigger):
+    """Returns the start and end indexes of the VP in the sentence."""
     vps = []
     def find_vps_recursive(tree): # Need to save indexes of the VPs
         for child in tree:
@@ -247,7 +248,27 @@ def get_nearest_vp_exceptional(t, idx, trigger):
         if len(vps) == 0:
             raise NoVPException
 
-        return t[max([vp.treeposition() for vp in vps])] # Return the right-most VP
+        ret = t[max([vp.treeposition() for vp in vps])]
+        retleaves = ret.leaves()
+
+        start,end,cursor = None,None,0
+        for i,word in enumerate(t.leaves()):
+            if retleaves[cursor] == word:
+                if start == None:
+                    start = i
+                    end = i
+                else:
+                    end = i
+                cursor += 1
+                if cursor == len(retleaves):
+                    break
+            else:
+                if start and end and end - start != len(retleaves):
+                    start,end = None,None
+                elif start and end:
+                    break
+
+        return retleaves,start+1,end+2 # Return the right-most VP, increment because of ROOT
 
     if len(vps) == 0:
         raise NoVPException

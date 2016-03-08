@@ -85,19 +85,19 @@ class AllSentences:
         vp = None
         sent = None
         try:
-            vp = nt.get_nearest_vp_exceptional(self.get_sentence_tree(trigger.sentnum), trigger.wordnum-1, trigger) # Go behind trigger.
+            vp,start,end = nt.get_nearest_vp_exceptional(self.get_sentence_tree(trigger.sentnum), trigger.wordnum-1, trigger) # Go behind trigger.
             sent = trigger.sentnum
         except nt.NoVPException:
             for sentnum in reversed(range(trigger.sentnum-2, trigger.sentnum)):
                 try:
-                    vp = nt.get_nearest_vp_exceptional(self.get_sentence_tree(sentnum), len(self[sentnum])-2, trigger)
+                    vp,start,end = nt.get_nearest_vp_exceptional(self.get_sentence_tree(sentnum), len(self[sentnum])-2, trigger)
                     sent = sentnum
                 except nt.NoVPException:
                     continue
 
-        assert vp != None
-
-        return
+        # assert vp,start,end
+        # print vp,start,end
+        return self.idxs_to_ant(sent, start, end, trigger)
 
     def set_possible_ants(self, trigger, pos_tests):
         for sentnum in range(max(0, trigger.sentnum - SENTENCE_SEARCH_DISTANCE), trigger.sentnum+1):
@@ -106,7 +106,8 @@ class AllSentences:
             for i in range(len(self.sentences[sentnum])):
                  tag = self.sentences[sentnum].pos[i]
 
-                 if True in (f(tag) for f in functions):
+                 # TODO: ADDED SECOND CLAUSE TO THIS IF TO LOWER NUMBER OF CANDIDATES GENERATED
+                 if True in (f(tag) for f in functions) and not wc.is_aux_lemma(self.sentences[sentnum].lemmas[i]):
                      phrase = nt.get_nearest_phrase(nt.maketree(self.sentences[sentnum]['tree'][0]), i, pos_tests)
                      phrase_length = nt.get_phrase_length(phrase)
 
@@ -116,8 +117,8 @@ class AllSentences:
                      for j in range(i, min(i+phrase_length+1, len(self.sentences[sentnum]))):
                          if not ant_after_trigger(sentnum, i, j, trigger):
 
-                             bad = False
-                             for pos_check in [wc.is_preposition, wc.is_punctuation, wc.is_determiner]:
+                             bad = False # TODO - I ADDEDED IS ADJ AND IS ADV TO THIS TO CONSTRAIN MORE
+                             for pos_check in [wc.is_preposition, wc.is_punctuation, wc.is_determiner, wc.is_adjective, wc.is_adverb]:
                                  if pos_check(self.sentences[sentnum].pos[j-1]):
                                      bad = True
 
@@ -128,42 +129,42 @@ class AllSentences:
 
             #Lets use the tree to decrease the number of dumb candidates.
 
-            phrases = [p for p in pos_tests if type(p)==str]
-            tree = nt.maketree(self.get_sentence(sentnum)['tree'][0])
-            tree_pos = nt.getsmallestsubtrees(tree)
-            tree_words = tree.leaves()
-            leaves_dict = { (tree_pos[i].label(), tree_words[i]) : i+1 for i in range(len(tree_words))}
-
-            new_ants = []
-            for pos in phrases:
-                for position in nt.phrase_positions_in_tree(tree, pos):
-                    start = None
-                    for w in nt.getsmallestsubtrees(tree[position]):
-                        # print w.label(), w[0]
-                        end = (w.label(), w[0])
-
-                        if not start:
-                            start = end
-
-                        if sentnum == trigger.sentnum and leaves_dict[end] == trigger.wordnum or wc.is_punctuation(end[0]):
-                            break
-
-                        ant = self.idxs_to_ant(sentnum, leaves_dict[start], leaves_dict[end]+1, trigger)
-
-                        if len(ant.sub_sentdict) > 0 and not ant_after_trigger(sentnum, start, end, trigger)\
-                            and not ((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger) in new_ants):
-
-                            bad = False
-                            for pos_check in [wc.is_preposition, wc.is_punctuation]:
-                                if pos_check(self.sentences[sentnum].pos[j-1]):
-                                    bad = True
-
-                            if not bad:
-                                ant = self.idxs_to_ant(sentnum, i, j, trigger)
-                                if len(ant.sub_sentdict) > 0:
-                                    trigger.add_possible_ant(ant)
-                                    new_ants.append((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger))
-
+            # phrases = [p for p in pos_tests if type(p)==str]
+            # tree = nt.maketree(self.get_sentence(sentnum)['tree'][0])
+            # tree_pos = nt.getsmallestsubtrees(tree)
+            # tree_words = tree.leaves()
+            # leaves_dict = { (tree_pos[i].label(), tree_words[i]) : i+1 for i in range(len(tree_words))}
+            #
+            # new_ants = []
+            # for pos in phrases:
+            #     for position in nt.phrase_positions_in_tree(tree, pos):
+            #         start = None
+            #         for w in nt.getsmallestsubtrees(tree[position]):
+            #             # print w.label(), w[0]
+            #             end = (w.label(), w[0])
+            #
+            #             if not start:
+            #                 start = end
+            #
+            #             if sentnum == trigger.sentnum and leaves_dict[end] == trigger.wordnum or wc.is_punctuation(end[0]):
+            #                 break
+            #
+            #             ant = self.idxs_to_ant(sentnum, leaves_dict[start], leaves_dict[end]+1, trigger)
+            #
+            #             i,j = leaves_dict[start],leaves_dict[end]
+            #             if len(ant.sub_sentdict) > 0 and not ant_after_trigger(sentnum, start, end, trigger)\
+            #                 and not ((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger) in new_ants):
+            #
+            #                 bad = False
+            #                 for pos_check in [wc.is_preposition, wc.is_punctuation]:
+            #                     if pos_check(self.sentences[sentnum].pos[j-1]):
+            #                         bad = True
+            #
+            #                 if not bad:
+            #                     ant = self.idxs_to_ant(sentnum, i, j, trigger)
+            #                     if len(ant.sub_sentdict) > 0:
+            #                         trigger.add_possible_ant(ant)
+            #                         new_ants.append((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger))
 
                             # print 'added poss_ant: %d to %d'%(leaves_dict[start], leaves_dict[end]+1),trigger.possible_ants[-1]
 
@@ -699,6 +700,12 @@ class Antecedent:
 
     def get_words(self):
         return self.sub_sentdict.words
+
+    def get_head(self):
+        for i in range(len(self.sub_sentdict.words)):
+            if wc.is_verb(self.sub_sentdict.pos[i]) and not wc.is_aux_lemma(self.sub_sentdict.lemmas[i]):
+                return self.sub_sentdict.words[i]
+        return self.sub_sentdict.words[0]
 
 class RawAntecedent:
     """ Only exists for extracting the annotations from the raw XML files. """
