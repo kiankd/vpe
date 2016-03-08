@@ -77,8 +77,7 @@ class AntecedentClassifier:
         self.diffs = []
         self.train_results, self.val_results, self.test_results = [], [], []
 
-    def initialize(self, pos_tests, seed=1917, W=None, test=0, delete_random=0.0,
-                   save=False, load=False, update=False, verbose=False):
+    def initialize(self, pos_tests, seed=1917, W=None, test=0, delete_random=0.0,save=False, load=False, update=False, verbose=False):
         if not load:
             self.import_data()
             self.generate_possible_ants(pos_tests, test=test, delete_random=delete_random)
@@ -410,18 +409,23 @@ class AntecedentClassifier:
                 self.val_results.append(self.criteria_based_results(val_preds))
                 self.test_results.append(self.criteria_based_results(test_preds))
 
-                print '\nEpoch %d - train/val/test error: %0.2f, %0.2f, %0.2f'\
+                print '\nEpoch %d Train/val/test error: %0.2f, %0.2f, %0.2f'\
                       %(n, self.train_err[-1], self.val_err[-1], self.test_err[-1])
 
-                # print 'Trigger sentnum,wordnum: %d,%d'%(trigger.sentnum,trigger.wordnum)
-                print self.sentences.get_sentence(trigger.sentnum)
+                print '\tTrain/val/test HeadM: %0.2f, %0.2f, %0.2f'\
+                      %(self.train_results[-1][1], self.val_results[-1][1], self.test_results[-1][1])
 
-                best_ant = self.bestk_ants(trigger, self.W_avg, k=1)[0]
+                # print 'Trigger sentnum,wordnum: %d,%d'%(trigger.sentnum,trigger.wordnum)
+                # print self.sentences.get_sentence(trigger.sentnum)
+
+                # best_ant = self.bestk_ants(trigger, self.W_avg, k=1)[0]
                 # print 'Best_ant sentnum = %d, start,end = %d,%d:'%(best_ant.sentnum,best_ant.start,best_ant.end),
-                print 'Best ant: start %d, end %d, trigger wordnum %d: '%(best_ant.start, best_ant.end, best_ant.trigger.wordnum)
-                print best_ant
+                # print 'Best ant: start %d, end %d, trigger wordnum %d: '%(best_ant.start, best_ant.end, best_ant.trigger.wordnum)
+                # print best_ant
                 self.diffs.append(np.mean((self.W_avg-self.W_old)**2))
-                print 'Difference btwen avg vector w_old: %0.6f'%(self.diffs[-1])
+                # print 'Difference btwen avg vector w_old: %0.6f'%(self.diffs[-1])
+
+
         self.train_results = np.array(self.train_results)
         self.val_results = np.array(self.val_results)
         self.test_results = np.array(self.test_results)
@@ -440,6 +444,10 @@ class AntecedentClassifier:
         # I think this should be slightly modified:
         # weigh the "head" - the first word of the gold_ant
         # more than the rest of the words.
+
+        # TODO: THIS MAY NOT BE GOOD TO HAVE!!
+        # if gold_ant.get_head() == proposed_ant.get_head():
+        #     return 0.0
 
         gold_vals = gold_ant.get_words()
         proposed_vals = proposed_ant.get_words()
@@ -686,12 +694,13 @@ if __name__ == '__main__':
 
     a = AntecedentClassifier(0,14, 15,19, 20,24)
     a.initialize(['VP', wc.is_adjective, wc.is_verb], seed=9001, save=False, load=True, update=False)
-    # a.set_trigger_type('do')
+    a.baseline_prediction()
+
     for lr in [0.01]:
         K = 5
         name = 'TESTING'
 
-        a.C = 0.1
+        a.C = 0.05
         a.learn_rate = lambda x: lr
 
         a.fit(epochs=100, k=K, verbose=True)
@@ -703,7 +712,6 @@ if __name__ == '__main__':
         # np.save('saved_weights/'+name, np.array(a.W_avg))
 
     print 'Time taken: %0.2f'%(time.clock() - start_time)
-
 
 
 """
@@ -744,7 +752,7 @@ WHAT IS TO BE DONE:
 BASELINE!!!!!!!!!!!!!!!
 
 # Add Hardt features!
-# Test changing Loss function to say 0% if there is NO head in the proposed ant (hard constraint)
+# Test changing Loss function to say 0percent if there is NO head in the proposed ant (hard constraint)
 # also can think about how we can weight diff words in loss function.
 # Make MIRA vizualization and check obj. function scoring of diff things
 
