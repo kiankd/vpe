@@ -292,20 +292,21 @@ def to_rule(sentdict, aux):
     return False
 
 def so_rule(sentdict, aux):
-    auxidx = aux.wordnum
+    """Here we only get auxiliaries that are of the form 'X so', 'X likewise' and 'X the [same/opposite]'"""
     if to_precedes_aux(sentdict, aux):
         return False
 
+    auxidx = aux.wordnum
     try:
-        if sentdict.lemmas[auxidx-1] == 'do' or sentdict.words[auxidx-1] == 'be':
-            if not is_adjective(sentdict.pos[auxidx+1]):
+        if sentdict.lemmas[auxidx] == 'do' or sentdict.words[auxidx] == 'be':
+            if not is_adjective(sentdict.pos[auxidx+2]):# and not is_adverb(sentdict.pos[auxidx+2]):
                 return True
     except IndexError:
         pass
 
     try:
-        if sentdict.lemmas[auxidx-1] == 'the' and (sentdict.lemmas[auxidx-2] == 'do' or sentdict.words[auxidx-1] == 'be'):
-            if not is_noun(sentdict.pos[auxidx+1]):
+        if sentdict.lemmas[auxidx+1] == 'the' and (sentdict.lemmas[auxidx] == 'do' or sentdict.words[auxidx] == 'be'):
+            if not is_noun(sentdict.pos[auxidx+3]):
                 return True
     except IndexError:
         pass

@@ -686,10 +686,10 @@ if __name__ == '__main__':
 
     a = AntecedentClassifier(0,14, 15,19, 20,24)
     a.initialize(['VP', wc.is_adjective, wc.is_verb], seed=9001, save=False, load=True, update=False)
-    a.set_trigger_type('do')
-    for lr in [0.01, 0.05, 0.1, 0.5]:
+    # a.set_trigger_type('do')
+    for lr in [0.01]:
         K = 5
-        name = 'DO_c0.1_lr%s_k5'%(lr)
+        name = 'TESTING'
 
         a.C = 0.1
         a.learn_rate = lambda x: lr
@@ -700,7 +700,7 @@ if __name__ == '__main__':
         a.reset()
         a.initialize_weights(seed=9001)
 
-        np.save('saved_weights/'+name, np.array(a.W_avg))
+        # np.save('saved_weights/'+name, np.array(a.W_avg))
 
     print 'Time taken: %0.2f'%(time.clock() - start_time)
 

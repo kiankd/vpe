@@ -102,8 +102,7 @@ class VPEDetectionClassifier:
                         try:
                             mrg_matrix = vpe.XMLMatrix(f+'.mrg.xml', self.file_names.XML_MRG+subdir)
                         except IOError:
-                            continue
-                            # mrg_matrix = XMLMatrix(f+'.pos.xml', self.file_names.XML_POS, pos_file=True)
+                            mrg_matrix = vpe.XMLMatrix(f+'.pos.xml', self.file_names.XML_POS, pos_file=True)
 
                         for sentdict in mrg_matrix:
                             self.all_auxiliaries.add_auxs(sentdict.get_auxiliaries(), sentnum_modifier=sentnum_modifier)
@@ -131,15 +130,16 @@ class VPEDetectionClassifier:
         a = np.array([self.gold_standard_auxs, self.annotations, self.sentences, self.all_auxiliaries,
                       self.train_vectors, self.train_classes, self.test_vectors, self.test_classes])
         if val:
-            np.save('vpe_detect_data_val', a)
+            np.save('vpe_detect_data_val_NON_MRG', a)
         else:
-            np.save('vpe_detect_data_test', a)
+            np.save('vpe_detect_data_test_NON_MRG', a)
 
-    def load_data_npy(self, val=False):
+    def load_data_npy(self, val=False, all_data=True):
+        string = '_NON_MRG' if all_data else ''
         if val:
-            a = np.load('vpe_detect_data_val.npy')
+            a = np.load('vpe_detect_data_val'+string+'.npy')
         else:
-            a = np.load('vpe_detect_data_test.npy')
+            a = np.load('vpe_detect_data_test'+string+'.npy')
 
         self.gold_standard_auxs = a[0]
         self.annotations = a[1]
@@ -170,13 +170,19 @@ class VPEDetectionClassifier:
             sentdict = self.sentences.get_sentence(aux.sentnum)
 
             if make_train_vectors and self.start_train <= sentdict.get_section() <= self.end_train:
-                self.train_vectors.append(csr_matrix(vc.make_vector(sentdict, aux, self.features, vpe.ALL_CATEGORIES, vpe.AUX_LEMMAS, vpe.ALL_AUXILIARIES, frequent_words, all_pos, pos_bigrams, make_old=use_old_vectors)))
+                self.train_vectors.append(csr_matrix(vc.make_vector(sentdict, aux, self.features, vpe.ALL_CATEGORIES,
+                                                                    vpe.AUX_LEMMAS, vpe.ALL_AUXILIARIES, frequent_words,
+                                                                    all_pos, pos_bigrams, make_old=use_old_vectors)))
+
                 self.train_classes.append(vc.bool_to_int(aux.is_trigger))
                 if len(self.train_vectors) % 1000 == 0 or len(self.train_vectors) == 1:
                     print 'Making the %dth training vector...'%(len(self.train_vectors))
 
             if make_test_vectors and self.start_test <= sentdict.get_section() <= self.end_test:
-                self.test_vectors.append(csr_matrix(vc.make_vector(sentdict, aux, self.features, vpe.ALL_CATEGORIES, vpe.AUX_LEMMAS, vpe.ALL_AUXILIARIES, frequent_words, all_pos, pos_bigrams, make_old=use_old_vectors)))
+                self.test_vectors.append(csr_matrix(vc.make_vector(sentdict, aux, self.features, vpe.ALL_CATEGORIES,
+                                                                   vpe.AUX_LEMMAS, vpe.ALL_AUXILIARIES, frequent_words,
+                                                                   all_pos, pos_bigrams, make_old=use_old_vectors)))
+
                 self.test_classes.append(vc.bool_to_int(aux.is_trigger))
                 if len(self.test_vectors) % 1000 == 0 or len(self.test_vectors) == 1:
                     print 'Making the %dth testing vector...'%(len(self.test_vectors))
@@ -221,25 +227,40 @@ class VPEDetectionClassifier:
             m = vstack((m,self.train_vectors[i]), format='csr')
         self.hyperplane.fit(m, np.array(self.train_classes))
 
+    def make_so(self):
+        for aux in self.all_auxiliaries:
+            sent = self.sentences[aux.sentnum].words
+            try:
+                if sent[aux.wordnum+1] == 'so' or sent[aux.wordnum+1] == 'likewise':
+                    aux.type = 'so'
+                if (sent[aux.wordnum+1] == 'the' and sent[aux.wordnum+2] in ['same','opposite']):
+                    aux.type = 'so'
+            except IndexError:
+                pass
+
     def set_aux_type(self, type_):
         # assert type_ in
         new_train,new_test = [],[]
         new_train_classes,new_test_classes = [],[]
+        new_auxs = vpe.Auxiliaries()
 
         for i in range(len(self.train_vectors)):
             if self.all_auxiliaries.get_aux(i).type == type_:
                 new_train.append(self.train_vectors[i])
                 new_train_classes.append(self.train_classes[i])
+                new_auxs.add_aux(self.all_auxiliaries.get_aux(i))
 
         for i in range(len(self.train_vectors), len(self.all_auxiliaries)):
             if self.all_auxiliaries.get_aux(i).type == type_:
                 new_test.append(self.test_vectors[i-len(self.train_vectors)])
                 new_test_classes.append(self.test_classes[i-len(self.train_vectors)])
+                new_auxs.add_aux(self.all_auxiliaries.get_aux(i))
 
         self.train_vectors = new_train
         self.train_classes = new_train_classes
         self.test_vectors = new_test
         self.test_classes = new_test_classes
+        self.all_auxiliaries = new_auxs
 
     def analyze_auxs(self):
         d = {}
@@ -288,7 +309,7 @@ class VPEDetectionClassifier:
                 elif aux.type == 'so': self.predictions.append(vc.bool_to_int(dv.socheck(sendict, auxidx, tree, word_subtree_positions)))
                 elif aux.type == 'to': self.predictions.append(vc.bool_to_int(dv.tocheck(sendict, auxidx, tree, word_subtree_positions)))
 
-    def results(self, name):
+    def results(self, name, set_name='Test'):
         if len(self.predictions) != len(self.test_classes):
             raise Exception('The number of test vectors != the number of test classes!')
 
@@ -315,7 +336,7 @@ class VPEDetectionClassifier:
         else:
             f1 = 2*precision*recall/(precision+recall)
 
-        print '\nResults from applying \"%s\" on the test set.'%name
+        print '\nResults from applying \"%s\" on the %s set.'%(name,set_name)
         print 'TP: %d, FP: %d, FN: %d'%(tp,fp,fn)
         print 'Precision: %0.2f'%precision
         print 'Recall: %0.2f'%recall
@@ -347,6 +368,13 @@ class VPEDetectionClassifier:
                 else:
                     f.write('\n%s: %0.3f\n'%(pair[0],pair[1]))
 
+    def initialize2(self, aux_type=None, rules_test=False):
+        if aux_type:
+            self.set_aux_type(aux_type)
+
+        if not rules_test:
+            self.oversample(multiplier=5)
+
 if __name__ == '__main__':
     start_time = time.clock()
 
@@ -356,8 +384,6 @@ if __name__ == '__main__':
 
     if len(argv) == 5:
         c = VPEDetectionClassifier(int(argv[1]),int(argv[2]),int(argv[3]),int(argv[4]))
-    else:
-        c = VPEDetectionClassifier(0,14,15,19)
 
     # c.all_auxiliaries.print_gold_auxiliaries()
 
@@ -374,20 +400,51 @@ if __name__ == '__main__':
 
     # c.file_names.make_all_the_files(c.sentences)
 
-    load = True
+    load = False
     if not load:
-        c.import_data()
-        c.set_features(features)
-        c.make_feature_vectors(make_test_vectors=True,use_old_vectors=False)
-        c.save_data_npy(val=False)
-    else:
-        c.load_data_npy(val=True)
-        c.analyze_auxs()
+        for t1,t2 in [(15,19),(20,24)]:
+            c = VPEDetectionClassifier(0,14,t1,t2)
+            c.load_data_npy(val=(c.start_test==15 and c.end_test==19), all_data=True)
+            c.set_features(features)
+            c.make_so()
+            c.make_feature_vectors(make_train_vectors=True, make_test_vectors=True, use_old_vectors=False)
+            c.normalize()
+            c.save_data_npy(val=(c.start_test==15 and c.end_test==19))
+        print 'Time taken: %0.2f'%(time.clock()-start_time)
         exit(0)
+    else:
+        c = VPEDetectionClassifier(0,14,15,19)
+        for type_ in ['']:#['do','to','so','be','modal','have']:
+            for b in [True, False]:
+                c.load_data_npy(val=b, all_data=True)
+                c.initialize2(aux_type=type_, rules_test=False)
 
-    c.oversample(multiplier=5)
-    c.set_aux_type('so')
-    c.normalize()
+                # c.test_my_rules(original_rules=False)
+                # c.results(type_.capitalize()+': Deterministic Rule testing', set_name='Validation' if b else 'Test')
+
+                c.set_classifier(c.LOGREGCV)
+                c.train()
+                c.test()
+                c.results(type_.capitalize()+': %s oversample 5'%c.LOGREGCV, set_name='Validation' if b else 'Test')
+
+                c.set_classifier(c.LINEAR_SVM)
+                c.train()
+                c.test()
+                c.results(type_.capitalize()+': %s oversample 5'%c.LINEAR_SVM, set_name='Validation' if b else 'Test')
+
+    # MRG data set: test - 80 P, 89 R
+    # MRG data set: vali - xx P, xx R
+    # MRG Do val 85 precision, 83 recall, Do test 95 precision 95 recall
+    # MRG So val 100 p 92 r, So test 64 P, 88 R
+    # MRG Modal val 95 p 95 r , modal test 92 p, 92 r
+
+    # FULL data set: test - 76 P, 87 R
+    # FULL data set: vali - 78 P, 81 R
+    # FULL Do val 85 p, 83 r, Do test 94 P, 96 R
+    # FULL So val xx p, xx r, So test xx P, xx R
+    # FULL Modal val xx p xx r , modal test xx p, xx r
+    # FULL My Rules: Val 67 p, 64 r; test 66 p, 70 r
+
 
     # c.oversample(multiplier=5)
 
@@ -396,12 +453,7 @@ if __name__ == '__main__':
     # c.test()
     # c.results('%s oversample 5'%c.RANDOMFOREST)
     # c.log_results('RANDOMFOREST_normalized_100estimators_4minsamplesleaf_all_features_old_rules_oversamplex5')
-
-    c.set_classifier(c.LOGREGCV)
-    c.train()
-    c.test()
-    c.results('%s oversample 5'%c.LOGREGCV)
-    c.log_results('logregcv_normalized_all_features_old_rules_oversamplex5')
+    # c.log_results('logregcv_normalized_all_features_old_rules_oversamplex5')
 
     # c.set_classifier(c.ADABOOST)
     # c.train()
@@ -436,5 +488,4 @@ if __name__ == '__main__':
         c.results('%s normalized oversample 5'%c.NAIVE_BAYES)
 
     # test()
-    print 'Time taken: %0.2f'%(time.clock()-start_time)
 
