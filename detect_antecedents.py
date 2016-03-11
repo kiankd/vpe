@@ -454,8 +454,8 @@ class AntecedentClassifier:
         # more than the rest of the words.
 
         # TODO: THIS MAY NOT BE GOOD TO HAVE!!
-        # if gold_ant.get_head() == proposed_ant.get_head():
-        #     return 0.0
+        if not gold_ant.get_head() == proposed_ant.get_head(): #in proposed_ant.sub_sentdict.words:
+            return 1.0
 
         gold_vals = gold_ant.get_words()
         proposed_vals = proposed_ant.get_words()
@@ -468,7 +468,7 @@ class AntecedentClassifier:
         recall = tp/(tp+fn)
         
         #dotprod = proposed_ant.score
-        #return 0.0 if dotprod >= 1.0 else 1.0-dotprod   
+        #return 0.0 if dotprod >= 0.5 else 0.5-dotprod   
         #norm_diff = np.linalg.norm(proposed_ant.x - gold_ant.x)
         #return 0.0 if norm_diff <= 0.25 else norm_diff-0.25
     
@@ -732,21 +732,22 @@ if __name__ == '__main__':
 
     a = AntecedentClassifier(0,14, 15,19, 20,24)
     a.initialize(['VP', wc.is_adjective, wc.is_verb], seed=347890, save=False, load=True, update=False)
+    a.set_trigger_type('do')
     a.baseline_prediction()
     a.gold_analysis()
 
-    for lr in [0.05]:
+    for lr in [0.01]:
         K = 5
-        name = 'TESTING_DO_l0.05_c_0.001'
+        name = 'TESTING_DO_l0.01_c_0.005'
 
-        a.C = 0.001
+        a.C = 1.0
         a.learn_rate = lambda x: lr
 
         a.fit(epochs=1000, k=K, verbose=True)
         a.make_graphs(name)
         a.log_results(name)
         a.reset()
-        a.initialize_weights(seed=9001)
+        a.initialize_weights(seed=3288124)
 
         # np.save('saved_weights/'+name, np.array(a.W_avg))
 
