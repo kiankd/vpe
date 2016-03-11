@@ -16,6 +16,23 @@ def getroot(subtree):
         crt = crt.parent()
     return crt
 
+def lowest_common_subtree_phrases(t, word_list):
+    lcst = lowest_common_subtree(t, word_list)
+    return get_phrases(lcst)
+
+def get_phrases(tree):
+    """ This gets all of the phrase labels from the tree. """
+    phrases = []
+    def recurse(t):
+        try:
+            phrases.append(t.label())
+        except AttributeError:
+            return
+        for child in t:
+            recurse(child)
+    recurse(tree)
+    return phrases
+
 def find_subtree_phrases(t, phrases):
     """ This is the best function here. """
     subtrees = []
@@ -95,8 +112,10 @@ def has_phrases_between_trees(subtree1, subtree2, phrases):
 
     while crt_phrase != subtree1 and crt_phrase.parent() != None:
         crt_phrase = crt_phrase.parent()
-        if crt_phrase.label() in phrases: return True
-        elif 'PRD' in phrases and crt_phrase.label().endswith('PRD'): return True
+        if crt_phrase.label() in phrases:
+            return True
+        elif 'PRD' in phrases and crt_phrase.label().endswith('PRD'):
+            return True
 
     return False
 
@@ -229,7 +248,7 @@ def get_nearest_vp(t, idx):
 
     return crt_node
 
-def get_nearest_vp_exceptional(t, idx, trigger):
+def get_nearest_vp_exceptional(t, idx, trigger, sentnum):
     """Returns the start and end indexes of the VP in the sentence."""
     vps = []
     def find_vps_recursive(tree): # Need to save indexes of the VPs
@@ -241,10 +260,13 @@ def get_nearest_vp_exceptional(t, idx, trigger):
     find_vps_recursive(t)
 
     if len(vps) >= 1:
-        trig_idx = getsmallestsubtrees(t)[trigger.wordnum-1].treeposition()
+        trig_idx = getsmallestsubtrees(t)[idx].treeposition()
+        to_remove = []
         for vp in vps:
-            if vp.treeposition() >= trig_idx[:-1]: # Don't include the last 0
-                vps.remove(vp) # Get rid of VPs that include the trigger
+            if sentnum==trigger.sentnum and vp.treeposition() >= trig_idx[:-1]: # Don't include the last 0
+                to_remove.append(vp) # Get rid of VPs that include the trigger
+        for badvp in to_remove:
+            vps.remove(badvp)
 
         if len(vps) == 0:
             raise NoVPException
