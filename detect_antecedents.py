@@ -420,8 +420,12 @@ class AntecedentClassifier:
                 print '\nEpoch %d Train/val/test error: %0.2f, %0.2f, %0.2f'\
                       %(n, self.train_err[-1], self.val_err[-1], self.test_err[-1])
 
+                print '\tTrain/val/test ExacM: %0.2f, %0.2f, %0.2f'\
+                      %(self.train_results[-1][0], self.val_results[-1][0], self.test_results[-1][0])
                 print '\tTrain/val/test HeadM: %0.2f, %0.2f, %0.2f'\
                       %(self.train_results[-1][1], self.val_results[-1][1], self.test_results[-1][1])
+                print '\tTrain/val/test HeadO: %0.2f, %0.2f, %0.2f'\
+                      %(self.train_results[-1][2], self.val_results[-1][2], self.test_results[-1][2])
 
                 # print 'Trigger sentnum,wordnum: %d,%d'%(trigger.sentnum,trigger.wordnum)
                 # print self.sentences.get_sentence(trigger.sentnum)
