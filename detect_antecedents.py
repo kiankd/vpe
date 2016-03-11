@@ -87,20 +87,15 @@ class AntecedentClassifier:
 
         else:
             self.load_imported_data()
+            self.debug_ant_selection()
             if update:
                 self.normalize()
 
-            # if update:
-            #     self.generate_possible_ants(pos_tests)
-            #     self.build_feature_vectors()
-            #     self.normalize()
-            # c=0
-            # for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
-            #     for ant in trigger.possible_ants:
-            #         if ant.contains_trigger():
-            #             c+=1
-            #             trigger.possible_ants.remove(ant)
-            # print 'Deleted %d ants!'%c
+        if save and load:
+            self.generate_possible_ants(pos_tests, test=test, delete_random=delete_random)
+            self.debug_ant_selection()
+            self.build_feature_vectors()
+            self.normalize()
 
         if save:
             self.save_imported_data()
@@ -134,7 +129,8 @@ class AntecedentClassifier:
                             mrg_matrix = vpe.XMLMatrix(f+'.mrg.xml', self.file_names.XML_MRG+subdir, get_deps=True)
                         except IOError:
                             continue
-                            # mrg_matrix = XMLMatrix(f+'.pos.xml', self.file_names.XML_POS, pos_file=True)
+                            # mrg_matrix = vpe.XMLMatrix(f+'.pos.xml', self.file_names.XML_POS, pos_file=True)
+                            # NO DEPENDENCIES IN POS FILES!
 
                         """ Note that I am using the gold standard triggers here. """
                         file_annotations = section_annotation.get_anns_for_file(f)
@@ -173,7 +169,7 @@ class AntecedentClassifier:
                 trigger.possible_ants = [trigger.gold_ant] + trigger.possible_ants[0:test]
             return
 
-        # Fair testing.
+        # Fair.
         for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
             trigger.possible_ants = []
 
@@ -193,11 +189,22 @@ class AntecedentClassifier:
                 size = len(all_ants)
                 all_ants.add((ant.sentnum,ant.start,ant.end))
 
+                if ant.sub_sentdict.pos[0] in ['PRP$', 'FW', ',', 'WDT', 'WP', '#', 'RP', 'POS', '.',
+                                               'TO', 'LS', '-LRB-', ':', 'NNP', 'WRB', 'CC', 'PDT',
+                                               'RBS', 'CD', 'EX', 'WP$', 'NNPS', '-RRB-', 'JJS', 'SYM',
+                                               'UH', 'root']:
+                    c += 1
+                    deletes.append(ant)
+
                 if len(all_ants) == size:
                     duplicates += 1
                     deletes.append(ant)
 
                 elif ant.contains_trigger():
+                    c += 1
+                    deletes.append(ant)
+
+                elif len(ant.sub_sentdict) == 0:
                     c += 1
                     deletes.append(ant)
 
@@ -244,15 +251,21 @@ class AntecedentClassifier:
         missed = 0
         total = 0
         lengths = []
-        missed_pos = {}
+        head_matches = 0
 
         if write_to_file:
             f = open(write_to_file, 'w')
 
         for trigger in self.train_triggers:
             lengths.append(len(trigger.possible_ants))
+            got_head = False
             try:
                 for poss_ant in trigger.possible_ants:
+                    if not got_head:
+                        if poss_ant.get_head() == trigger.gold_ant.get_head():
+                            got_head = True
+                            head_matches += 1
+
                     if poss_ant.sub_sentdict == trigger.gold_ant.sub_sentdict:
                         raise vpe.Finished()
             except vpe.Finished:
@@ -261,12 +274,6 @@ class AntecedentClassifier:
 
             total += 1
             missed += 1
-
-            pos = trigger.gold_ant.sub_sentdict.pos[0]
-            if pos in missed_pos:
-                missed_pos[pos] +=1
-            else:
-                missed_pos[pos] = 1
 
             if verbose:
                 print '\nMISSED ANT FOR TRIGGER',trigger
@@ -280,8 +287,9 @@ class AntecedentClassifier:
 
         s = ['Total ants: %d'%sum(lengths),
             '\nMissed this many gold possible ants: %d'%missed,
-            'That is %0.2f percent.'%(float(missed)/total),
-            'Average length of possible ants: %d'%np.mean(lengths),
+             'That is %0.2f percent.'%(float(missed)/total),
+             'Got this many head matches as a percent of total: %0.2f'%(head_matches/float(len(self.train_triggers))),
+             'Average length of possible ants: %d'%np.mean(lengths),
              'Min/Max lengths: %d, %d\n'%(min(lengths),max(lengths))]
 
         for x in s:
@@ -645,16 +653,40 @@ class AntecedentClassifier:
 
         print len(self.train_triggers), len(self.val_triggers), len(self.test_triggers)
 
-    def baseline_prediction(self):
+    def baseline_prediction(self, verbose=False):
         """Baseline algorithm that only considers nearest VP."""
         train_ant_pred = [self.sentences.nearest_vp(trig) for trig in self.train_triggers]
         val_ant_pred = [self.sentences.nearest_vp(trig) for trig in self.val_triggers]
         test_ant_pred = [self.sentences.nearest_vp(trig) for trig in self.test_triggers]
+        if verbose:
+            for trig in self.train_triggers:
+                print '---------------'
+                print self.sentences[trig.sentnum]
+                print 'ANT: ',
+                print self.sentences.nearest_vp(trig)
+                print 'GOLD ANT: ',
+                print trig.gold_ant
 
         print 'Baseline results:'
         print '\tTrain: ',self.criteria_based_results(train_ant_pred)
         print '\tVal: ',self.criteria_based_results(val_ant_pred)
         print '\tTest: ',self.criteria_based_results(test_ant_pred)
+
+    def gold_analysis(self):
+        d = {'starts_with_aux':[]}
+        all_pos = set()
+        for s in self.sentences:
+            for p in s.pos:
+                all_pos.add(p)
+
+        ant_start_pos = set()
+        for trig in self.train_triggers:
+            if wc.is_aux_lemma(trig.gold_ant.sub_sentdict.words[0]):
+                d['starts_with_aux'].append(trig.gold_ant)
+            ant_start_pos.add(trig.gold_ant.sub_sentdict.pos[0])
+
+        print 'Ants never start with these tags: ', all_pos - ant_start_pos
+        print 'Percent of ants that start with auxs: ',len(d['starts_with_aux']) / float(len(self.train_triggers))
 
 if __name__ == '__main__':
     pos_tests = ['VP', wc.is_adjective, wc.is_verb]
@@ -684,24 +716,24 @@ if __name__ == '__main__':
     #              save=False, load=False, update=False, seed=2384834)
     #
     else:
-        a = AntecedentClassifier(0,14, None,None, None,None)
+        a = AntecedentClassifier(0,14, 15,19, 20,24)
         print 'Debugging...'
-        a.initialize(pos_tests, save=False, load=True, update=False, seed=2384834)
-
-        for trig in a.train_triggers:
-            ant = trig.gold_ant
-            print '---------------------'
-            print a.sentences.get_sentence_tree(ant.sentnum)
-            print ant.sub_sentdict
-
+        a.initialize(pos_tests, save=True, load=True, update=False, seed=2384834)
         a.debug_ant_selection(verbose=False)
+
+        # for trig in a.train_triggers:
+        #     ant = trig.gold_ant
+        #     print '---------------------'
+        #     print a.sentences.get_sentence_tree(ant.sentnum)
+        #     print ant.sub_sentdict
+
         # a.debug_alignment(verbose=False)
         exit(0)
 
     a = AntecedentClassifier(0,14, 15,19, 20,24)
     a.initialize(['VP', wc.is_adjective, wc.is_verb], seed=347890, save=False, load=True, update=False)
-    a.set_trigger_type('do')
     a.baseline_prediction()
+    a.gold_analysis()
 
     for lr in [0.05]:
         K = 5

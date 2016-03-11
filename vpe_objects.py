@@ -61,6 +61,9 @@ class AllSentences:
         self.sentences = []
 
     def __iter__(self):
+        """
+        @type yield: SentDict
+        """
         for sentdict in self.sentences:
             yield sentdict
 
@@ -88,12 +91,12 @@ class AllSentences:
         vp = None
         sent = None
         try:
-            vp,start,end = nt.get_nearest_vp_exceptional(self.get_sentence_tree(trigger.sentnum), trigger.wordnum-1, trigger) # Go behind trigger.
+            vp,start,end = nt.get_nearest_vp_exceptional(self.get_sentence_tree(trigger.sentnum), trigger.wordnum-1, trigger, trigger.sentnum) # Go behind trigger.
             sent = trigger.sentnum
         except nt.NoVPException:
             for sentnum in reversed(range(trigger.sentnum-2, trigger.sentnum)):
                 try:
-                    vp,start,end = nt.get_nearest_vp_exceptional(self.get_sentence_tree(sentnum), len(self[sentnum])-2, trigger)
+                    vp,start,end = nt.get_nearest_vp_exceptional(self.get_sentence_tree(sentnum), len(self[sentnum])-2, trigger, sentnum)
                     sent = sentnum
                 except nt.NoVPException:
                     continue
@@ -110,7 +113,7 @@ class AllSentences:
                  tag = self.sentences[sentnum].pos[i]
 
                  # TODO: ADDED SECOND CLAUSE TO THIS IF TO LOWER NUMBER OF CANDIDATES GENERATED
-                 if True in (f(tag) for f in functions) and not wc.is_aux_lemma(self.sentences[sentnum].lemmas[i]):
+                 if True in (f(tag) for f in functions): #and not wc.is_aux_lemma(self.sentences[sentnum].lemmas[i]):
                      phrase = nt.get_nearest_phrase(nt.maketree(self.sentences[sentnum]['tree'][0]), i, pos_tests)
                      phrase_length = nt.get_phrase_length(phrase)
 
@@ -119,9 +122,8 @@ class AllSentences:
 
                      for j in range(i, min(i+phrase_length+1, len(self.sentences[sentnum]))):
                          if not ant_after_trigger(sentnum, i, j, trigger):
-
-                             bad = False # TODO - I ADDEDED IS ADJ AND IS ADV TO THIS TO CONSTRAIN MORE
-                             for pos_check in [wc.is_preposition, wc.is_punctuation, wc.is_determiner, wc.is_adjective, wc.is_adverb]:
+                             bad = False
+                             for pos_check in [wc.is_preposition, wc.is_punctuation, wc.is_determiner]:
                                  if pos_check(self.sentences[sentnum].pos[j-1]):
                                      bad = True
 
@@ -377,7 +379,12 @@ class XMLMatrix:
         return Antecedent(start[0]+sentnum_modifier+1, trigger, SubSentDict(sentdict.words[i:j], sentdict.pos[i:j], sentdict.lemmas[i:j]), i, j)
 
 class SubSentDict:
-    """Antecedents have this."""
+    """
+        Antecedents have this.
+        @type words: list
+        @type pos: list
+        @type lemmas: list
+    """
     def __init__(self, words, pos, lemmas, start=None, end=None):
         self.words = words
         self.pos = pos
@@ -406,10 +413,17 @@ class SentDict:
 
         if not raw:
             self.tree_text = [tree.text for tree in sentence.iter('parse')]
+            self.tree_text[0] = self.fix_quotes_str(self.tree_text[0])
+
             if len(self.tree_text) != 0:
                 self.words = ['ROOT']+[word.text for word in sentence.iter('word')]
                 self.lemmas = ['root']+[lemma.text for lemma in sentence.iter('lemma')]
                 self.pos = ['root']+[pos.text for pos in sentence.iter('POS')]
+
+                self.fix_quotes(self.words)
+                self.fix_quotes(self.lemmas)
+                self.fix_quotes(self.pos)
+
                 if get_deps:
                     for dep_type in sentence.iter('dependencies'):
                         if dep_type.get('type') == "collapsed-ccprocessed-dependencies": #this only happens once
@@ -421,6 +435,8 @@ class SentDict:
                 raise EmptySentDictException()
         else:
             self.words = [word.text for word in sentence.iter('word')]
+            self.fix_quotes(self.words)
+
             self.offset_starts = [int(start.text) for start in sentence.iter('CharacterOffsetBegin')]
             self.offset_ends = [int(end.text) for end in sentence.iter('CharacterOffsetEnd')]
 
@@ -435,6 +451,21 @@ class SentDict:
 
     def __repr__(self):
         return self.words_to_string()
+
+    def fix_quotes(self, lst):
+        bads = ['``', "''"]
+
+        for i,string in enumerate(lst):
+            if string in bads:
+                lst[i] = "\""
+
+    def fix_quotes_str(self, s):
+        bads = ['``', "''"]
+
+        news = s
+        for bad in bads:
+            news = news.replace(bad,"\"")
+        return news
 
     def get_auxiliaries(self, raw=False):
         sent_auxs = []
@@ -667,6 +698,11 @@ class RawAuxiliary:
 """" ---- Antecedent classes. ---- """
 class Antecedent:
     def __init__(self, sentnum, trigger, sub_sentdict, start, end, section=-1):
+        """
+            @type trigger: Auxiliary
+            @type sub_sentdict: SubSentDict
+            @type subtree: nt.nltk.ParentedTree
+        """
         self.sentnum = sentnum
         self.subtree = None
         self.trigger = trigger
@@ -709,21 +745,29 @@ class Antecedent:
     def get_words(self):
         return self.sub_sentdict.words
 
-    def get_head(self, idx=False):
+    def get_head(self, idx=False, idx_in_subsentdict=False):
         """
-        @type return: str
+            @type return: str
         """
-        for i in range(len(self.sub_sentdict.words)):
+        for i in range(len(self.sub_sentdict)):
             if wc.is_verb(self.sub_sentdict.pos[i]) and not wc.is_aux_lemma(self.sub_sentdict.lemmas[i]):
                 if idx:
-                    return i
+                    if idx_in_subsentdict:
+                        return i
+                    else:
+                        return self.start+i
                 else:
                     return self.sub_sentdict.words[i]
 
-        if idx:
+        if idx and not idx_in_subsentdict:
+            return self.start
+        elif idx_in_subsentdict:
             return 0
         else:
-            return self.sub_sentdict.words[0]
+            try:
+                return self.sub_sentdict.words[0]
+            except IndexError:
+                return ''
 
 class RawAntecedent:
     """ Only exists for extracting the annotations from the raw XML files. """

@@ -5,12 +5,13 @@
 #
 # The context is the list of chunked dependencies within the realm of the trigger/antecedent's
 # nearest clause.
-from nltktree import get_nearest_clause
+from nltktree import get_nearest_clause,lowest_common_subtree_phrases,get_phrases
 from copy import copy
 from vpe_objects import chunks_to_string
 import numpy as np
 import antecedent_vector_creation as avc
 import word2vec_functionality as w2v
+import word_characteristics as wc
 
 MAPPING_LENGTHS = []
 MAX_SCORE = 4.0
@@ -46,7 +47,7 @@ def alignment_matrix(sentences, trigger, word2vec_dict, dep_names=('prep','adv',
         ant.x = np.array([1] + alignment_vector(mapping, untrigs, unants, dep_names, word2vec_dict, verbose=False)
                              + relational_vector(trigger, ant)
                              + avc.ant_trigger_relationship(ant, trigger, sentences, pos_tags)
-                             + hardt_features(ant, trigger, sentences))
+                             + hardt_features(ant, trigger, sentences, pos_tags))
 
     # print 'Avg mapping, trig_chunks, ant_chunks lengths: %0.2f, %d, %0.2f'\
     #       %(np.mean(MAPPING_LENGTHS), len(trig_chunks),np.mean(ANT_CHUNK_LENGTHS))
@@ -55,12 +56,17 @@ def alignment_matrix(sentences, trigger, word2vec_dict, dep_names=('prep','adv',
     MAPPING_LENGTHS = []
     return
 
-def hardt_features(ant, trig, sentences):
+def hardt_features(ant, trig, sentences, pos_tags):
     """
         This exists to add features that are based on what Hardt did in 1997.
         @type ant: vpe_objects.Antecedent
+        @type trig: vpe_objects.Auxiliary
+        @type sentences: vpe_objects.AllSentences
     """
     v = []
+    sent_tree = sentences.get_sentence_tree(ant.sentnum)
+    ant_sent = sentences.get_sentence(ant.sentnum)
+    trig_sent = sentences.get_sentence(trig.sentnum)
 
     vp = sentences.nearest_vp(trig)
     vp_head = vp.get_head()
@@ -76,6 +82,75 @@ def hardt_features(ant, trig, sentences):
     v.append(ant.sentnum - vp.sentnum)
     v.append(ant.start - vp.start)
     v.append(ant.end - vp.end)
+
+    # be-do form
+    try:
+        v.append(1.0 if wc.is_be(ant_sent.lemmas[ant.start-1]) or wc.is_be(ant_sent.lemmas[ant.start]) else 0.0)
+        v.append(1.0 if trig.type == 'do' and v[-1]==1.0 else 0.0)
+    except IndexError:
+        v += [0.0, 0.0]
+
+    # quotation features
+    quote_start_trig, quote_end_trig = None,None
+    for i,w in enumerate(trig_sent.lemmas):
+        if w == "\"":
+            if not quote_start_trig:
+                quote_start_trig = i
+            else:
+                quote_end_trig = i
+                break
+
+    trig_in_quotes = False
+    if quote_start_trig and quote_end_trig:
+        trig_in_quotes = quote_start_trig <= trig.wordnum <= quote_end_trig
+        v.append(1.0 if trig_in_quotes else 0.0)
+    else:
+        v.append(0.0)
+
+    quote_start_ant, quote_end_ant = None,None
+    for i,w in enumerate(ant_sent.lemmas):
+        if w == "\"":
+            if not quote_start_ant:
+                quote_start_ant = i
+            else:
+                quote_end_ant = i
+                break
+
+    ant_in_quotes = False
+    if quote_start_ant and quote_end_ant:
+        ant_in_quotes = quote_start_ant <= ant.start <= quote_end_ant and quote_start_ant <= ant.end <= quote_end_ant
+        v.append(1.0 if quote_start_ant <= ant.start <= quote_end_ant else 0.0)
+        v.append(1.0 if quote_start_ant <= ant.end <= quote_end_ant else 0.0)
+    else:
+        v += [0.0,0.0]
+
+    v.append(1.0 if trig_in_quotes and ant_in_quotes else 0.0)
+
+
+    # Nielsen features
+    v.append(1.0 if wc.is_aux_lemma(ant.sub_sentdict.lemmas[0]) else 0.0)
+    v.append(1.0 if wc.is_aux_lemma(ant.sub_sentdict.lemmas[ant.get_head(idx=True, idx_in_subsentdict=True)]) else 0.0)
+    for tag in pos_tags:
+        v.append(float(ant.sub_sentdict.pos.count(tag)))
+
+    for phrase in ['NP','VP','S','SINV','ADVP','ADJP','PP']:
+        v.append(len(map(lambda s: s.startswith(phrase), lowest_common_subtree_phrases(sent_tree, ant.get_words()))))
+        v.append(len(map(lambda s: s.startswith(phrase), get_phrases(sent_tree))))
+
+    if ant.sentnum == trig.sentnum:
+        v.append(1.0 if 'than' in ant_sent.words[ant.end : trig.wordnum] else 0.0)
+        v.append(1.0 if 'as' in ant_sent.words[ant.end : trig.wordnum] else 0.0)
+    else:
+        v.append(0.0)
+        v.append(0.0)
+    try:
+        v.append(1.0 if ant_sent.words[ant.start-1] == trig.word else 0.0)
+        v.append(1.0 if ant_sent.lemmas[ant.start-1] == trig.lemma else 0.0)
+        v.append(1.0 if ant_sent.lemmas[ant.start-1] == trig.type else 0.0)
+        v.append(1.0 if ant_sent.pos[ant.start-1] == trig.pos else 0.0)
+    except IndexError:
+        v += [0.0, 0.0, 0.0, 0.0]
+
 
     return v
 
@@ -203,6 +278,7 @@ def alignment_vector(mapping, un_mapped_trigs, un_mapped_ants, dep_names, word2v
     else:
         v += [0.0, 0.0, 0.0, 0.0]
 
+    # Word2vec features.
     angles = []
     for tup in mapping:
         a = angle_between_chunks(tup[0], tup[1], word2vec_dict)
