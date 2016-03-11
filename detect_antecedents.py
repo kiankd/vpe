@@ -458,8 +458,14 @@ class AntecedentClassifier:
 
         precision = tp/(tp+fp)
         recall = tp/(tp+fn)
+        
+        #dotprod = proposed_ant.score
+        #return 0.0 if dotprod >= 1.0 else 1.0-dotprod   
+        #norm_diff = np.linalg.norm(proposed_ant.x - gold_ant.x)
+        #return 0.0 if norm_diff <= 0.25 else norm_diff-0.25
+    
         try:
-            return 1.0 - (2.0*precision*recall)/(precision+recall)
+            return (1.0 - (2.0*precision*recall)/(precision+recall))
         except ZeroDivisionError:
             return 1.0
 
@@ -693,17 +699,18 @@ if __name__ == '__main__':
         exit(0)
 
     a = AntecedentClassifier(0,14, 15,19, 20,24)
-    a.initialize(['VP', wc.is_adjective, wc.is_verb], seed=9001, save=False, load=True, update=False)
+    a.initialize(['VP', wc.is_adjective, wc.is_verb], seed=347890, save=False, load=True, update=False)
+    a.set_trigger_type('do')
     a.baseline_prediction()
 
-    for lr in [0.01]:
+    for lr in [0.05]:
         K = 5
-        name = 'TESTING'
+        name = 'TESTING_DO_l0.05_c_0.001'
 
-        a.C = 0.05
+        a.C = 0.001
         a.learn_rate = lambda x: lr
 
-        a.fit(epochs=100, k=K, verbose=True)
+        a.fit(epochs=1000, k=K, verbose=True)
         a.make_graphs(name)
         a.log_results(name)
         a.reset()
