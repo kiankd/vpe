@@ -457,8 +457,7 @@ class AntecedentClassifier:
         # weigh the "head" - the first word of the gold_ant
         # more than the rest of the words.
 
-        # TODO: THIS MAY NOT BE GOOD TO HAVE!!
-        if not gold_ant.get_head() == proposed_ant.get_head(): #in proposed_ant.sub_sentdict.words:
+        if not gold_ant.get_head() in proposed_ant.sub_sentdict.words:
             return 1.0
 
         gold_vals = gold_ant.get_words()
@@ -470,16 +469,17 @@ class AntecedentClassifier:
 
         precision = tp/(tp+fp)
         recall = tp/(tp+fn)
-        
+    
+        if precision == 0.0 or recall == 0.0:
+            return 1.0
+
+        f1 = (2.0*precision*recall)/(precision+recall)
         #dotprod = proposed_ant.score
         #return 0.0 if dotprod >= 0.5 else 0.5-dotprod   
         #norm_diff = np.linalg.norm(proposed_ant.x - gold_ant.x)
         #return 0.0 if norm_diff <= 0.25 else norm_diff-0.25
     
-        try:
-            return (1.0 - (2.0*precision*recall)/(precision+recall))
-        except ZeroDivisionError:
-            return 1.0
+        return 1.0 - f1
 
     def accuracy(self, predictions):
         errors = []
@@ -645,13 +645,15 @@ class AntecedentClassifier:
         self.val_triggers = data[2]
         self.test_triggers = data[3]
 
-    def set_trigger_type(self, type_):
+    def set_trigger_type(self, type_, alter_train=False):
         """
         We use this if we want to see how the algorithm performs when it only trains and tests
         on one type of trigger, i.e. "do".
         """
         assert type_ in ['modal', 'be', 'have', 'do', 'to', 'so']
-        self.train_triggers = [trig for trig in self.train_triggers if trig.type == type_]
+        if alter_train:
+            self.train_triggers = [trig for trig in self.train_triggers if trig.type == type_]
+        
         self.val_triggers = [trig for trig in self.val_triggers if trig.type == type_]
         self.test_triggers = [trig for trig in self.test_triggers if trig.type == type_]
 
@@ -736,18 +738,18 @@ if __name__ == '__main__':
 
     a = AntecedentClassifier(0,14, 15,19, 20,24)
     a.initialize(['VP', wc.is_adjective, wc.is_verb], seed=347890, save=False, load=True, update=False)
-    a.set_trigger_type('do')
+    a.set_trigger_type('do', alter_train=False)
     a.baseline_prediction()
-    a.gold_analysis()
+    # a.gold_analysis()
 
     for lr in [0.01]:
         K = 5
-        name = 'TESTING_DO_l0.01_c_0.005'
+        name = 'TESTING_HEADOLOSS_DO_l0.01_c_0.001'
 
-        a.C = 1.0
+        a.C = 0.001
         a.learn_rate = lambda x: lr
 
-        a.fit(epochs=1000, k=K, verbose=True)
+        a.fit(epochs=100, k=K, verbose=True)
         a.make_graphs(name)
         a.log_results(name)
         a.reset()
