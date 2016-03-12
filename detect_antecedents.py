@@ -9,7 +9,7 @@ import optimize_mira_dual as mira
 import truth
 import time
 import sys
-from heapq import nlargest
+from heapq import nlargest, nsmallest
 from os import listdir
 from pyprind import ProgBar
 from random import randrange,sample
@@ -87,6 +87,7 @@ class AntecedentClassifier:
 
         else:
             self.load_imported_data()
+            self.generate_possible_ants(pos_tests, only_filter=True)
             self.debug_ant_selection()
             if update:
                 self.normalize()
@@ -159,44 +160,81 @@ class AntecedentClassifier:
                         sentnum_modifier = len(self.sentences)-1
             dnum += 1
 
-    def generate_possible_ants(self, pos_tests, test=0, delete_random=0.0):
+    def generate_possible_ants(self, pos_tests, test=0, delete_random=0.0, only_filter=False):
         """Generate all candidate antecedents."""
-        print 'Generating possible antecedents...'
-        if test: # ONLY FOR TESTING! THIS CHEATS!!
+        if not only_filter:
+            print 'Generating possible antecedents...'
+            if test: # ONLY FOR TESTING! THIS CHEATS!!
+                for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
+                    trigger.possible_ants = []
+                    self.sentences.set_possible_ants(trigger, pos_tests)
+                    trigger.possible_ants = [trigger.gold_ant] + trigger.possible_ants[0:test]
+                return
+
+            # Fair.
             for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
                 trigger.possible_ants = []
+
                 self.sentences.set_possible_ants(trigger, pos_tests)
-                trigger.possible_ants = [trigger.gold_ant] + trigger.possible_ants[0:test]
-            return
+                trigger.possible_ants = list(trigger.possible_ants)
 
-        # Fair.
-        for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
-            trigger.possible_ants = []
+        if only_filter:
+            print 'Filtering antecedents out...'
 
-            self.sentences.set_possible_ants(trigger, pos_tests)
-            trigger.possible_ants = list(trigger.possible_ants)
+
+        # Get POS tags that we can use to filter out the antecedents:
+        all_pos = set()
+        for s in self.sentences:
+            for p in s.pos:
+                all_pos.add(p)
+        all_pos_combos = set([(a,b) for a in all_pos for b in all_pos])
+
+        ant_start_pos_combo = set()
+        ant_end_pos_combo = set()
+        ant_start_pos = set()
+        ant_end_pos = set()
+        for trig in self.train_triggers:
+            ant_start_pos.add(trig.gold_ant.sub_sentdict.pos[0])
+            ant_end_pos.add(trig.gold_ant.sub_sentdict.pos[-1])
+            if len(trig.gold_ant.sub_sentdict) > 1:
+                ant_start_pos_combo.add((trig.gold_ant.sub_sentdict.pos[0],trig.gold_ant.sub_sentdict.pos[1]))
+                ant_end_pos_combo.add((trig.gold_ant.sub_sentdict.pos[-1],trig.gold_ant.sub_sentdict.pos[-2]))
+
+        filter_start_combo = all_pos_combos - ant_start_pos_combo
+        filter_end_combo = all_pos_combos - ant_end_pos_combo
+        filter_start = all_pos - ant_start_pos
+        filter_end = all_pos - ant_end_pos
 
         # Delete antecedents that contain the trigger in them:
         c = 0
-        num_ants = 0
         duplicates = 0
         all_ants = set([])
         for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
             deletes = []
             for ant in trigger.possible_ants:
-                num_ants += 1
-
                 size = len(all_ants)
                 all_ants.add((ant.sentnum,ant.start,ant.end))
 
-                if ant.sub_sentdict.pos[0] in ['PRP$', 'FW', ',', 'WDT', 'WP', '#', 'RP', 'POS', '.',
-                                               'TO', 'LS', '-LRB-', ':', 'NNP', 'WRB', 'CC', 'PDT',
-                                               'RBS', 'CD', 'EX', 'WP$', 'NNPS', '-RRB-', 'JJS', 'SYM',
-                                               'UH', 'root']:
+                if False:
+                    pass
+
+                if ant.sub_sentdict.pos[0] in filter_start:
                     c += 1
                     deletes.append(ant)
 
-                if len(all_ants) == size:
+                elif ant.sub_sentdict.pos[-1] in filter_end:
+                    c += 1
+                    deletes.append(ant)
+
+                elif len(ant.sub_sentdict) > 1 and (ant.sub_sentdict.pos[0],ant.sub_sentdict.pos[1]) in filter_start_combo:
+                    c += 1
+                    deletes.append(ant)
+
+                elif len(ant.sub_sentdict) > 1 and (ant.sub_sentdict.pos[-1],ant.sub_sentdict.pos[-2]) in filter_end_combo:
+                    c += 1
+                    deletes.append(ant)
+
+                elif len(all_ants) == size:
                     duplicates += 1
                     deletes.append(ant)
 
@@ -211,7 +249,6 @@ class AntecedentClassifier:
             for ant in deletes:
                 trigger.possible_ants.remove(ant)
 
-        print '%d total ants after deletion - deleted the %d duplicates!'%(num_ants-duplicates, duplicates)
         print 'Deleted %d bad antecedents!'%c
 
     def bestk_ants(self, trigger, w, k=5):
@@ -256,7 +293,9 @@ class AntecedentClassifier:
         if write_to_file:
             f = open(write_to_file, 'w')
 
-        for trigger in self.train_triggers:
+        check_list = self.train_triggers
+
+        for trigger in check_list:
             lengths.append(len(trigger.possible_ants))
             got_head = False
             try:
@@ -288,7 +327,7 @@ class AntecedentClassifier:
         s = ['Total ants: %d'%sum(lengths),
             '\nMissed this many gold possible ants: %d'%missed,
              'That is %0.2f percent.'%(float(missed)/total),
-             'Got this many head matches as a percent of total: %0.2f'%(head_matches/float(len(self.train_triggers))),
+             'Got this many head matches as a percent of total: %0.2f'%(head_matches/float(len(check_list))),
              'Average length of possible ants: %d'%np.mean(lengths),
              'Min/Max lengths: %d, %d\n'%(min(lengths),max(lengths))]
 
@@ -401,6 +440,7 @@ class AntecedentClassifier:
                 self.W_avg = ((1.0-self.learn_rate(i)) * self.W_avg) + (self.learn_rate(i) * self.W_old) # Running average.
                 self.analyze(self.W_avg, features_to_analyze)
                 i+=1
+
             if n % self.SCHEDULE_FREQUENCY == 0:
                 self.C /= c_schedule
 
@@ -671,7 +711,7 @@ class AntecedentClassifier:
         print '\tTest: ',self.criteria_based_results(test_ant_pred)
 
     def gold_analysis(self):
-        d = {'starts_with_aux':[]}
+        d = {'starts_with_aux':[], 'ends_with_aux':[]}
         all_pos = set()
         for s in self.sentences:
             for p in s.pos:
@@ -683,8 +723,18 @@ class AntecedentClassifier:
                 d['starts_with_aux'].append(trig.gold_ant)
             ant_start_pos.add(trig.gold_ant.sub_sentdict.pos[0])
 
+        ant_end_pos = set()
+        for trig in self.train_triggers:
+            if wc.is_aux_lemma(trig.gold_ant.sub_sentdict.words[-1]):
+                d['ends_with_aux'].append(trig.gold_ant)
+            ant_start_pos.add(trig.gold_ant.sub_sentdict.pos[-1])
+
         print 'Ants never start with these tags: ', all_pos - ant_start_pos
         print 'Percent of ants that start with auxs: ',len(d['starts_with_aux']) / float(len(self.train_triggers))
+
+        print 'Ants never END with these tags: ', all_pos - ant_end_pos
+        print 'Percent of ants that END with auxs: ',len(d['ends_with_aux']) / float(len(self.train_triggers))
+
 
 if __name__ == '__main__':
     pos_tests = ['VP', wc.is_adjective, wc.is_verb]
@@ -730,9 +780,8 @@ if __name__ == '__main__':
 
     a = AntecedentClassifier(0,14, 15,19, 20,24)
     a.initialize(['VP', wc.is_adjective, wc.is_verb], seed=9001, save=False, load=True, update=False)
-    a.baseline_prediction(True)
-    a.gold_analysis()
-    exit(0)
+    a.baseline_prediction(False)
+    a.set_trigger_type('do')
 
     for lr in [0.01]:
         K = 5
@@ -794,6 +843,12 @@ BASELINE!!!!!!!!!!!!!!!
 # also can think about how we can weight diff words in loss function.
 # Make MIRA vizualization and check obj. function scoring of diff things
 
+
+- try training it on FULL dataset for testing on just do -*
+- have a correctness measure of looking at the top K antecedents and if the exact one
+is in this list of K then we can say that, well when we miss we are pretty close
+- look at some examples and see what the margin of score between the best and second best
+- MOAR FEATURESSSSZZ
 """
 
 
