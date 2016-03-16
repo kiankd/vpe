@@ -160,6 +160,16 @@ class AntecedentClassifier:
                         sentnum_modifier = len(self.sentences)-1
             dnum += 1
 
+        for trig in self.train_triggers + self.val_triggers + self.test_triggers:
+            sent = self.sentences[trig.sentnum].words
+            try:
+                if sent[trig.wordnum+1] == 'so' or sent[trig.wordnum+1] == 'likewise':
+                    trig.type = 'so'
+                if (sent[trig.wordnum+1] == 'the' and sent[trig.wordnum+2] in ['same','opposite']):
+                    trig.type = 'so'
+            except IndexError:
+                pass
+
     def generate_possible_ants(self, pos_tests, test=0, delete_random=0.0, only_filter=False):
         """Generate all candidate antecedents."""
         if not only_filter:
@@ -553,6 +563,10 @@ class AntecedentClassifier:
             if ho:
                 head_overlap += 1
 
+        # print exact_match, len(predictions)
+        # print head_match, len(predictions)
+        # print head_overlap, len(predictions)
+
         exact_match /= float(len(predictions))
         head_match /= float(len(predictions))
         head_overlap /= float(len(predictions))
@@ -685,6 +699,16 @@ class AntecedentClassifier:
         self.val_triggers = data[2]
         self.test_triggers = data[3]
 
+        for trig in self.train_triggers + self.val_triggers + self.test_triggers:
+            sent = self.sentences[trig.sentnum].words
+            try:
+                if sent[trig.wordnum+1] == 'so' or sent[trig.wordnum+1] == 'likewise':
+                    trig.type = 'so'
+                if (sent[trig.wordnum+1] == 'the' and sent[trig.wordnum+2] in ['same','opposite']):
+                    trig.type = 'so'
+            except IndexError:
+                pass
+
     def set_trigger_type(self, type_, alter_train=False):
         """
         We use this if we want to see how the algorithm performs when it only trains and tests
@@ -694,8 +718,13 @@ class AntecedentClassifier:
         if alter_train:
             self.train_triggers = [trig for trig in self.train_triggers if trig.type == type_]
         
+        old_len = len(self.val_triggers)
         self.val_triggers = [trig for trig in self.val_triggers if trig.type == type_]
+        print 'Frequency of %s in validation: %d out of a total of %d.'%(type_, len(self.val_triggers), old_len)
+
+        old_len = len(self.test_triggers)
         self.test_triggers = [trig for trig in self.test_triggers if trig.type == type_]
+        print 'Frequency of %s in test: %d out of a total of %d.'%(type_, len(self.test_triggers), old_len)
 
         print len(self.train_triggers), len(self.val_triggers), len(self.test_triggers)
 
@@ -719,6 +748,17 @@ class AntecedentClassifier:
         print '\tTest: ',self.criteria_based_results(test_ant_pred)
 
     def gold_analysis(self):
+        print 'Triggers:',
+        freq = {}
+        for trig in self.train_triggers + self.test_triggers + self.val_triggers:
+            if not freq.has_key(trig.type):
+                freq[trig.type] = 1
+            else:
+                freq[trig.type] += 1
+        print freq
+        print 'Total:',sum(freq.values())
+
+
         d = {'starts_with_aux':[], 'ends_with_aux':[]}
         all_pos = set()
         for s in self.sentences:
@@ -742,7 +782,6 @@ class AntecedentClassifier:
 
         print 'Ants never END with these tags: ', all_pos - ant_end_pos
         print 'Percent of ants that END with auxs: ',len(d['ends_with_aux']) / float(len(self.train_triggers))
-
 
 if __name__ == '__main__':
     pos_tests = ['VP', wc.is_adjective, wc.is_verb]
@@ -774,7 +813,7 @@ if __name__ == '__main__':
     else:
         a = AntecedentClassifier(0,14, 15,19, 20,24)
         print 'Debugging...'
-        a.initialize(pos_tests, save=True, load=True, update=False, seed=2384834)
+        a.initialize(pos_tests, save=True, load=True, update=False, seed=2334)
         a.debug_ant_selection(verbose=False)
 
         # for trig in a.train_triggers:
@@ -786,17 +825,20 @@ if __name__ == '__main__':
         # a.debug_alignment(verbose=False)
         exit(0)
 
+    # for type_ in ['do','so','modal','to','have','be']:
     a = AntecedentClassifier(0,14, 15,19, 20,24)
     a.initialize(['VP', wc.is_adjective, wc.is_verb], seed=347890, save=False, load=True, update=False)
-    a.set_trigger_type('do', alter_train=False)
+    # a.set_trigger_type(type_, alter_train=False)
     a.baseline_prediction()
-    # a.gold_analysis()
+
+    a.gold_analysis()
+    exit(0)
 
     for lr in [0.01]:
         K = 5
         name = 'TESTING_HEADOLOSS_DO_l0.01_c_0.001'
 
-        a.C = 0.001
+        a.C = 0.1
         a.learn_rate = lambda x: lr
 
         a.fit(epochs=100, k=K, verbose=True)

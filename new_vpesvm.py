@@ -8,8 +8,8 @@ import vpe_objects as vpe
 
 from file_names import Files
 from scipy.sparse import csr_matrix,vstack
-from sklearn.svm import SVC
-from sklearn.svm import LinearSVC
+from sklearn.svm import SVC, LinearSVC, NuSVC
+# from sklearn.svm import
 from sklearn.linear_model import LogisticRegression,LogisticRegressionCV
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.tree import DecisionTreeClassifier
@@ -33,6 +33,7 @@ from sys import argv
 """ ---- Primary Classes and methods. ---- """
 class VPEDetectionClassifier:
     SVM = 'SVM'
+    NUSVM = 'NuSVC'
     LINEAR_SVM = 'Linear SVC'
     LOGREG = 'Logistic regression'
     NAIVE_BAYES = 'Naive Bayes'
@@ -69,6 +70,7 @@ class VPEDetectionClassifier:
 
     def set_classifier(self, classifier):
         if classifier==self.SVM: self.hyperplane = SVC()
+        elif classifier==self.NUSVM: self.hyperplane = NuSVC(nu=0.9)
         elif classifier==self.LINEAR_SVM: self.hyperplane = LinearSVC()
         elif classifier==self.LOGREG: self.hyperplane = LogisticRegression()
         elif classifier==self.NAIVE_BAYES: self.hyperplane = MultinomialNB()
@@ -77,6 +79,8 @@ class VPEDetectionClassifier:
         elif classifier==self.DECISION_TREE_WITH_OPTIONS: self.hyperplane = DecisionTreeClassifier(max_depth=10, min_samples_leaf=3)
         elif classifier==self.RANDOMFOREST: self.hyperplane = RandomForestClassifier(n_estimators=100, min_samples_leaf=4)
         elif classifier==self.ADABOOST: self.hyperplane = AdaBoostClassifier(random_state=1917,n_estimators=100)
+        else:
+            self.hyperplane = classifier
 
     def set_features(self, features):
         self.features = features
@@ -130,9 +134,9 @@ class VPEDetectionClassifier:
         a = np.array([self.gold_standard_auxs, self.annotations, self.sentences, self.all_auxiliaries,
                       self.train_vectors, self.train_classes, self.test_vectors, self.test_classes])
         if val:
-            np.save('vpe_detect_data_val_NON_MRG', a)
+            np.save('vpe_detect_data_val', a)
         else:
-            np.save('vpe_detect_data_test_NON_MRG', a)
+            np.save('vpe_detect_data_test', a)
 
     def load_data_npy(self, val=False, all_data=True):
         string = '_NON_MRG' if all_data else ''
@@ -400,11 +404,11 @@ if __name__ == '__main__':
 
     # c.file_names.make_all_the_files(c.sentences)
 
-    load = False
+    load = True
     if not load:
         for t1,t2 in [(15,19),(20,24)]:
             c = VPEDetectionClassifier(0,14,t1,t2)
-            c.load_data_npy(val=(c.start_test==15 and c.end_test==19), all_data=True)
+            c.load_data_npy(val=(c.start_test==15 and c.end_test==19), all_data=False) # We only use MRG files.
             c.set_features(features)
             c.make_so()
             c.make_feature_vectors(make_train_vectors=True, make_test_vectors=True, use_old_vectors=False)
@@ -414,23 +418,44 @@ if __name__ == '__main__':
         exit(0)
     else:
         c = VPEDetectionClassifier(0,14,15,19)
-        for type_ in ['']:#['do','to','so','be','modal','have']:
-            for b in [True, False]:
-                c.load_data_npy(val=b, all_data=True)
+        for type_ in ['']:#,'do']:#['do','to','so','be','modal','have']:
+            for b in [True]:#, False]:
+                c.load_data_npy(val=b, all_data=False)
+
+                # for aux in c.gold_standard_auxs:
+                #     sent = c.sentences.get_sentence(aux.sentnum)
+                #     print sent.file,':',sent
+                # exit(0)
+
                 c.initialize2(aux_type=type_, rules_test=False)
 
                 # c.test_my_rules(original_rules=False)
                 # c.results(type_.capitalize()+': Deterministic Rule testing', set_name='Validation' if b else 'Test')
 
-                c.set_classifier(c.LOGREGCV)
-                c.train()
-                c.test()
-                c.results(type_.capitalize()+': %s oversample 5'%c.LOGREGCV, set_name='Validation' if b else 'Test')
+                # c.set_classifier(c.LOGREGCV)
+                # c.train()
+                # c.test()
+                # c.results(type_.capitalize()+': %s oversample 5'%c.LOGREGCV, set_name='Validation' if b else 'Test')
+                #
+                # c.set_classifier(c.LINEAR_SVM)
+                # c.train()
+                # c.test()
+                # c.results(type_.capitalize()+': %s oversample 5'%c.LINEAR_SVM, set_name='Validation' if b else 'Test')
 
-                c.set_classifier(c.LINEAR_SVM)
-                c.train()
-                c.test()
-                c.results(type_.capitalize()+': %s oversample 5'%c.LINEAR_SVM, set_name='Validation' if b else 'Test')
+                # nu = 0.00
+                # while nu<=1:
+                #     c.set_classifier(NuSVC(nu=nu))
+                #     try:
+                #         print 'NU = ',nu
+                #         c.train()
+                #         c.test()
+                #         c.results(type_.capitalize()+': %s oversample 5'%c.NUSVM, set_name='Validation' if b else 'Test')
+                #     except ValueError:
+                #         print 'Infeasible Nu!!!'
+                #     nu += 0.05
+
+
+                # print '--------------------------------------'
 
     # MRG data set: test - 80 P, 89 R
     # MRG data set: vali - xx P, xx R

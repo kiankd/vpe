@@ -5,7 +5,7 @@
 #
 # The context is the list of chunked dependencies within the realm of the trigger/antecedent's
 # nearest clause.
-from nltktree import get_nearest_clause,lowest_common_subtree_phrases,get_phrases
+from nltktree import get_nearest_clause,lowest_common_subtree_phrases,get_phrases,getwordtreepositions
 from copy import copy
 from vpe_objects import chunks_to_string
 import numpy as np
@@ -44,6 +44,7 @@ def alignment_matrix(sentences, trigger, word2vec_dict, dep_names=('prep','adv',
 
         mapping, untrigs, unants = align(trig_chunks, ant_chunks, dep_names, word2vec_dict)
 
+        # TODO: COMMENTED OUT FEATURES TO TEST
         ant.x = np.array([1] + alignment_vector(mapping, untrigs, unants, dep_names, word2vec_dict, verbose=False)
                              + relational_vector(trigger, ant)
                              + avc.ant_trigger_relationship(ant, trigger, sentences, pos_tags)
@@ -131,18 +132,32 @@ def hardt_features(ant, trig, sentences, pos_tags):
     v.append(1.0 if wc.is_aux_lemma(ant.sub_sentdict.lemmas[0]) else 0.0)
     v.append(1.0 if wc.is_aux_lemma(ant.sub_sentdict.lemmas[ant.get_head(idx=True, idx_in_subsentdict=True)]) else 0.0)
     for tag in pos_tags:
-        v.append(float(ant.sub_sentdict.pos.count(tag)))
+        v.append(1.0 if tag == ant.sub_sentdict.pos[0] else 0.0) # Sparse encoding of the pos tag of first word in ant
+        v.append(1.0 if tag == ant.sub_sentdict.pos[-1] else 0.0) # Sparse encoding of the pos tag of last word in ant
+        v.append(float(ant.sub_sentdict.pos.count(tag)) / len(ant.sub_sentdict)) # Frequency of the given pos tag in ant
 
+    for fun in [wc.is_adverb, wc.is_verb, wc.is_adverb, wc.is_noun, wc.is_preposition, wc.is_punctuation, wc.is_predicative]:
+        v.append(1.0 if fun(ant.sub_sentdict.pos[0]) else 0.0) # Sparse encoding of the identity of first word in ant
+        v.append(1.0 if fun(ant.sub_sentdict.pos[-1]) else 0.0) # Sparse encoding of the identity of last word in ant
+        v.append(float(len(map(fun,ant.sub_sentdict.pos))) / len(ant.sub_sentdict)) # Frequency of the given function in ant
+
+    sent_phrases = get_phrases(sent_tree)
+    ant_phrases = lowest_common_subtree_phrases(sent_tree, ant.get_words())
+
+    v.append(float(len(ant_phrases)) / len(sent_phrases))
     for phrase in ['NP','VP','S','SINV','ADVP','ADJP','PP']:
-        v.append(len(map(lambda s: s.startswith(phrase), lowest_common_subtree_phrases(sent_tree, ant.get_words()))))
-        v.append(len(map(lambda s: s.startswith(phrase), get_phrases(sent_tree))))
+        v.append(len(map(lambda s: s.startswith(phrase), ant_phrases)) / float(len(ant_phrases)))
+        v.append(len(map(lambda s: s.startswith(phrase), sent_phrases)) / float(len(sent_phrases)))
 
+    continuation_words = ['than','as','so']
     if ant.sentnum == trig.sentnum:
-        v.append(1.0 if 'than' in ant_sent.words[ant.end : trig.wordnum] else 0.0)
-        v.append(1.0 if 'as' in ant_sent.words[ant.end : trig.wordnum] else 0.0)
+        v.append(1.0)
+        for word in continuation_words:
+            v.append(1.0 if word in ant_sent.words[ant.end : trig.wordnum] else 0.0)
     else:
         v.append(0.0)
-        v.append(0.0)
+        for word in continuation_words:
+            v.append(0.0)
     try:
         v.append(1.0 if ant_sent.words[ant.start-1] == trig.word else 0.0)
         v.append(1.0 if ant_sent.lemmas[ant.start-1] == trig.lemma else 0.0)
@@ -151,6 +166,37 @@ def hardt_features(ant, trig, sentences, pos_tags):
     except IndexError:
         v += [0.0, 0.0, 0.0, 0.0]
 
+    # Theoretical linguistics features
+    if ant.sentnum == trig.sentnum:
+        word_positions = getwordtreepositions(sent_tree)
+
+        v.append(1.0)
+        v.append(1.0 if wc.ccommands(ant.start, trig.wordnum, sent_tree, word_positions) else 0.0)
+        v.append(1.0 if wc.ccommands(trig.wordnum, ant.start, sent_tree, word_positions) else 0.0)
+        v.append(1.0 if wc.ccommands(ant.end, trig.wordnum, sent_tree, word_positions) else 0.0)
+        v.append(1.0 if wc.ccommands(trig.wordnum, ant.end, sent_tree, word_positions) else 0.0)
+
+        # Check if a word in the antecedent c-commands the trig and vice versa.
+        ant_word_ccommands,trig_ccommands = False,False
+        for idx in range(ant.start, ant.end+1):
+            if wc.ccommands(idx, trig.wordnum, sent_tree, word_positions):
+                v.append(1.0)
+                ant_word_ccommands = True
+
+            if wc.ccommands(trig.wordnum, idx, sent_tree, word_positions):
+                v.append(1.0)
+                trig_ccommands = True
+
+            if ant_word_ccommands and trig_ccommands: # speed boost of 0.02ms kek
+                break
+
+        if not ant_word_ccommands:
+            v.append(0.0)
+
+        if not trig_ccommands:
+            v.append(0.0)
+    else:
+        v += [0.0 for _ in range(7)]
 
     return v
 
@@ -400,7 +446,6 @@ def find_word_sequence(words, targets):
 
     return start,end
 
-# TODO: !!!
 """
 ADD FEATURE - NUMBER/PROPORTION OF UNMAPPED WORDS
 GET rid of trigger's clause from antecedent chunks
