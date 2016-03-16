@@ -71,6 +71,9 @@ def is_punctuation(tag):
     return tag in ['.',',','-','--','\'','\"',':']
 
 """ My features. """
+def ccommands(w1_idx, w2_idx, tree, word_positions):
+    return nt.ccommands(tree, word_positions[w1_idx-1], word_positions[w2_idx-1])
+
 def aux_ccommands_verb(sentdict, aux, tree, word_positions_in_tree):
     subtrees = nt.getsmallestsubtrees(tree)
 
