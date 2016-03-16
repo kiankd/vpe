@@ -441,10 +441,10 @@ class AntecedentClassifier:
                 self.analyze(self.W_avg, features_to_analyze)
                 i+=1
 
-            if n % self.SCHEDULE_FREQUENCY == 0:
-                self.C /= c_schedule
+            # if n % self.SCHEDULE_FREQUENCY == 0:
+            #     self.C /= c_schedule
 
-            if verbose and n>0:
+            # if verbose and n>0:
                 train_preds = self.predict(self.train_triggers)
                 val_preds = self.predict(self.val_triggers)
                 test_preds = self.predict(self.test_triggers)
@@ -457,6 +457,8 @@ class AntecedentClassifier:
                 self.val_results.append(self.criteria_based_results(val_preds))
                 self.test_results.append(self.criteria_based_results(test_preds))
 
+                self.diffs.append(np.mean((self.W_avg-self.W_old)**2))
+
                 print '\nEpoch %d Train/val/test error: %0.2f, %0.2f, %0.2f'\
                       %(n, self.train_err[-1], self.val_err[-1], self.test_err[-1])
 
@@ -467,6 +469,8 @@ class AntecedentClassifier:
                 print '\tTrain/val/test HeadO: %0.2f, %0.2f, %0.2f'\
                       %(self.train_results[-1][2], self.val_results[-1][2], self.test_results[-1][2])
 
+
+
                 # print 'Trigger sentnum,wordnum: %d,%d'%(trigger.sentnum,trigger.wordnum)
                 # print self.sentences.get_sentence(trigger.sentnum)
 
@@ -474,13 +478,17 @@ class AntecedentClassifier:
                 # print 'Best_ant sentnum = %d, start,end = %d,%d:'%(best_ant.sentnum,best_ant.start,best_ant.end),
                 # print 'Best ant: start %d, end %d, trigger wordnum %d: '%(best_ant.start, best_ant.end, best_ant.trigger.wordnum)
                 # print best_ant
-                self.diffs.append(np.mean((self.W_avg-self.W_old)**2))
                 # print 'Difference btwen avg vector w_old: %0.6f'%(self.diffs[-1])
 
 
         self.train_results = np.array(self.train_results)
         self.val_results = np.array(self.val_results)
         self.test_results = np.array(self.test_results)
+
+        # final results
+        best_idx = self.val_results[:,1].argmax()
+        print 'Best validation head match - %0.2f'%self.val_results[:,1][best_idx]
+        print 'This gives us the following test head match - %0.2f'%self.test_results[:,1][best_idx]
 
     def predict(self, trigger_list):
         predictions = []
@@ -497,8 +505,8 @@ class AntecedentClassifier:
         # weigh the "head" - the first word of the gold_ant
         # more than the rest of the words.
 
-        # if not gold_ant.get_head() in proposed_ant.sub_sentdict.words:
-        #     return 1.0
+        # if not gold_ant.get_head() == proposed_ant.get_head():
+        #    return 1.0
 
         gold_vals = gold_ant.get_words()
         proposed_vals = proposed_ant.get_words()
@@ -514,6 +522,7 @@ class AntecedentClassifier:
             return 1.0
 
         f1 = (2.0*precision*recall)/(precision+recall)
+
         #dotprod = proposed_ant.score
         #return 0.0 if dotprod >= 0.5 else 0.5-dotprod   
         #norm_diff = np.linalg.norm(proposed_ant.x - gold_ant.x)
@@ -553,6 +562,10 @@ class AntecedentClassifier:
             if ho:
                 head_overlap += 1
 
+        # print exact_match, len(predictions)
+        # print head_match, len(predictions)
+        # print head_overlap, len(predictions)
+
         exact_match /= float(len(predictions))
         head_match /= float(len(predictions))
         head_overlap /= float(len(predictions))
@@ -576,7 +589,8 @@ class AntecedentClassifier:
         self.feature_vals[-1].append(w[-1])
 
     def make_graphs(self, name):
-        params = 'tests/post_changes/%s'%name
+        # params = 'tests/post_changes/%s'%name
+        params = 'best_results_analysis/%s'%name
 
         plt.figure(1)
         plt.title('Running Average Weight Vector 2-Norm over time')
@@ -751,7 +765,6 @@ if __name__ == '__main__':
         debug = sys.argv[1] == 'debug'
     except IndexError:
         debug = False
-        pass
 
     # if debug:
     #     a = AntecedentClassifier(0,14, 15,19, 20,24, C=0.075, learn_rate=lambda x: 0.0001)
@@ -786,31 +799,85 @@ if __name__ == '__main__':
         # a.debug_alignment(verbose=False)
         exit(0)
 
-    a = AntecedentClassifier(0,14, 15,19, 20,24)
-    a.initialize(['VP', wc.is_adjective, wc.is_verb], seed=347890, save=False, load=True, update=False)
-    a.set_trigger_type('do', alter_train=False)
-    a.baseline_prediction()
+    sign = lambda x: 1 if x>=0 else -1
+    rand_range = 5
+
+    # a.baseline_prediction()
     # a.gold_analysis()
 
-    for lr in [0.01]:
-        K = 5
-        name = 'TESTING_HEADOLOSS_DO_l0.01_c_0.001'
+    a = AntecedentClassifier(0,14, 15,19, 20,24)
+    seed = 347890 #int(sys.argv[1].split('seed=')[1])
 
-        a.C = 0.001
-        a.learn_rate = lambda x: lr
+    a.initialize(['VP', wc.is_adjective, wc.is_verb], seed=seed, save=False, load=True, update=False)
+    # a.baseline_prediction()
+    
+    a.set_trigger_type('so', alter_train=False)
+    a.baseline_prediction()
 
-        a.fit(epochs=100, k=K, verbose=True)
-        a.make_graphs(name)
-        a.log_results(name)
-        a.reset()
-        a.initialize_weights(seed=3288124)
+    exit(0)
 
-        # np.save('saved_weights/'+name, np.array(a.W_avg))
+    # np.random.seed(seed)
+    # my_weights = np.array(
+    #     [sign(np.random.randint(-1,1)) * rand_range * np.random.rand() 
+    #     for _ in range(len(a.train_triggers[0].possible_ants[0].x))])
+
+    # a.W_old = copy(my_weights)
+    # a.W_avg = copy(my_weights)
+
+
+    # 81% val HM, 82% test HM when gold_ant added to Val and Test (cheatily)
+    for trig in []:#a.train_triggers: #+ a.val_triggers + a.test_triggers:
+        has = False
+        for ant in trig.possible_ants:
+            if ant == trig.gold_ant:
+                has = True
+                break
+        if not has:
+            trig.possible_ants.append(trig.gold_ant)
+
+
+    lr = 0.01
+    K = 5
+    a.C = 5.0
+    a.learn_rate = lambda x: lr #if x == 0 or x % 25 else lr**(x/25)
+
+
+    name = 'RANDOMNESS_results_by_trig_c%s_lr%s_k%s_randrange%s_'%(str(a.C),str(lr),str(K),str(rand_range))
+
+    print '\nLEARN RATE, C, K, seed:', lr, a.C, K, seed
+
+
+
+    a.fit(epochs=2, k=K, verbose=True)
+    # a.make_graphs(name)
+    # a.log_results(name)
+    # a.reset()
+    # a.initialize_weights(seed=347890)
+
+    # np.save('saved_weights/'+name, np.array(a.W_avg))
 
     print 'Time taken: %0.2f'%(time.clock() - start_time)
 
 
 """
+
+-------------
+best results:
+c = 5.0, k = 5, lr = 0.01 - regular loss function, over 'do', seed=347890 ==> 71 hm val, 73 hm test
+c = 5.0, k = 5, lr = 0.01 - regular loss function, over 'do', seed=124312421 ==> 44 hm val, 53 hm test
+c = 5.0, k = 5, lr = 0.01 - regular loss function, over 'do', seed=9000 ==> 46 hm val, 58 hm test
+
+c = 5.0, k = 5, lr = 0.01 - regular loss function, over 'do', weights 1 ==> 52 hm val, 64 hm test
+c = 5.0, k = 5, lr = 0.01 - regular loss function, over 'do', seed=7777455577 ==> 58 hm val, 76 hm test
+
+c = 5.0, k = 10, lr = 0.01 - regular loss function, over 'do', seed=347890 ==> 63 hm val, 60 hm test
+c = 5.0, k = 15, lr = 0.1 - regular loss function, over 'do', seed=347890 ==> 62 hm val, 67 hm test
+c = 5.0, k = 20, lr = 0.1 - regular loss function, over 'do', seed=347890 ==> 62 hm val, 67 hm test
+c = 5.0, k = 5, lr = 0.001 - regular loss function, over 'do', seed=347890 ==> 67 hm val, 69 hm test
+c = 5.0, k = 5, lr = 0.05 - regular loss function, over 'do', seed=347890 ==> 60 hm val, 73 hm test
+c = 5.0, k = 5, lr = 0.1 - regular loss function, over 'do', seed=347890 ==> 58 hm val, 73 hm test
+c = 5.0, k = 5, lr = 0.5 - regular loss function, over 'do', seed=347890 ==> 58 hm val, 69 hm test
+-------------
 
 1) Delete potential antecedents that contain the trigger in them  - DONE
     --> Figure out why there seems to be low recall in getting gold ants for extraction - DONE AND FIXED
