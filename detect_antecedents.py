@@ -833,23 +833,15 @@ if __name__ == '__main__':
 
         # a.debug_alignment(verbose=False)
         exit(0)
-        
+
     sign = lambda x: 1 if x>=0 else -1
     rand_range = 5
-
-    # a.baseline_prediction()
-    # a.gold_analysis()
-    # for type_ in ['do','so','modal','to','have','be']:
-
     a = AntecedentClassifier(0,14, 15,19, 20,24)
     seed = 347890 #int(sys.argv[1].split('seed=')[1])
 
-    a.initialize(['VP', wc.is_adjective, wc.is_verb], seed=seed, save=False, load=True, update=False)
-    # a.baseline_prediction()
-    
-    a.set_trigger_type('so', alter_train=False)
+    a.initialize(['VP', wc.is_adjective, wc.is_verb], seed=seed, save=False, load=True, update=False)    
+    # a.set_trigger_type('so', alter_train=False)
     a.baseline_prediction()
-    exit(0)
 
     # np.random.seed(seed)
     # my_weights = np.array(
@@ -861,7 +853,7 @@ if __name__ == '__main__':
 
 
     # 81% val HM, 82% test HM when gold_ant added to Val and Test (cheatily)
-    for trig in []:#a.train_triggers: #+ a.val_triggers + a.test_triggers:
+    for trig in a.train_triggers: #+ a.val_triggers + a.test_triggers:
         has = False
         for ant in trig.possible_ants:
             if ant == trig.gold_ant:
@@ -876,10 +868,9 @@ if __name__ == '__main__':
     a.learn_rate = lambda x: lr #if x == 0 or x % 25 else lr**(x/25)
 
 
-    name = 'RANDOMNESS_results_by_trig_c%s_lr%s_k%s_randrange%s_'%(str(a.C),str(lr),str(K),str(rand_range))
-
+    # name = 'RANDOMNESS_results_by_trig_c%s_lr%s_k%s_randrange%s_'%(str(a.C),str(lr),str(K),str(rand_range))
+    name = 'SUPER_FINAL_RESULTS_by_trig_c%s_lr%s_k%s'%(str(a.C),str(lr),str(K))
     print '\nLEARN RATE, C, K, seed:', lr, a.C, K, seed
-
 
 
     a.fit(epochs=2, k=K, verbose=True)
@@ -889,6 +880,7 @@ if __name__ == '__main__':
     # a.initialize_weights(seed=347890)
 
     # np.save('saved_weights/'+name, np.array(a.W_avg))
+    print '\nLEARN RATE, C, K, seed:', lr, a.C, K, seed
 
     print 'Time taken: %0.2f'%(time.clock() - start_time)
 
