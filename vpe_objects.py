@@ -73,6 +73,13 @@ class AllSentences:
     def __getitem__(self, item):
         return self.get_sentence(item)
 
+    def get_all_dependencies(self):
+        deps = set()
+        for sent in self.sentences[:100]:
+            for dep in sent.dependencies:
+                deps.add(dep.name)
+        return deps
+
     def add_mrg(self, mrg_matrix):
         for sentdict in mrg_matrix:
             self.sentences.append(sentdict)
@@ -498,10 +505,10 @@ class SentDict:
     def get_nltk_tree(self):
         return nt.maketree(self.tree_text[0])
 
-    def chunked_dependencies(self, i, j, dep_names=('prep','adv','dobj','nsubj')):
+    def chunked_dependencies(self, i, j, dep_names=None):
         """Here we will return a list of all relevant dependency clusters between word i and word j."""
         deps = [dep for dep in self.dependencies if ((i <= dep.gov <= j) and (i <= dep.dependent <= j)
-                                                                         and dep.name in dep_names)]
+                                                                         and not dep_names or (dep_names and dep.name in dep_names))]
         # This makes it so that the gov is always the smaller one.
         for dep in deps:
             if dep.gov > dep.dependent:

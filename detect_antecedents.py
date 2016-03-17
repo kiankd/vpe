@@ -88,6 +88,7 @@ class AntecedentClassifier:
             self.load_imported_data()
             self.generate_possible_ants(pos_tests, only_filter=False)
             self.debug_ant_selection()
+            self.debug_ant_selection(check_list=self.val_triggers)
             if update:
                 self.build_feature_vectors(test_specific=test_specific)
                 self.normalize()
@@ -278,12 +279,13 @@ class AntecedentClassifier:
         print 'Building feature vectors...'
 
         bar = ProgBar(len(self.train_triggers)+len(self.val_triggers)+len(self.test_triggers))
+        dep_names = self.sentences.get_all_dependencies()
 
         for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
             if not (test_specific[0] and test_specific[1]) or (test_specific[0] == trigger.sentnum and test_specific[1] == trigger.wordnum):
                 alignment_matrix(self.sentences, trigger, word2vec_dict,
-                                 dep_names= ('prep','nsubj','dobj','nmod','adv','conj','vmod','amod','csubj'),
-                                 pos_tags= all_pos_tags)
+                                 dep_names=dep_names, #('prep','nsubj','dobj','nmod','adv','conj','vmod','amod','csubj'),
+                                 pos_tags=all_pos_tags)
                 bar.update()
 
         return
@@ -826,7 +828,7 @@ if __name__ == '__main__':
     else:
         a = AntecedentClassifier(0,14, 15,19, 20,24)
         print 'Debugging...'
-        a.initialize(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb], seed=123, save=False, load=True, update=True, test_specific=(14036,14))
+        a.initialize(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb], seed=123, save=False, load=True, update=True)#, test_specific=(14036,14))
         # a.initialize(pos_tests, save=True, load=True, update=False, seed=2334)
         # a.debug_ant_selection(verbose=False)
         # for trig in a.train_triggers:
@@ -848,7 +850,7 @@ if __name__ == '__main__':
     a = AntecedentClassifier(0,14, 15,19, 20,24)
     seed = 347890 #int(sys.argv[1].split('seed=')[1])
 
-    a.initialize(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb], seed=seed, save=False, load=True, update=True, test_specific=(14036,14))
+    a.initialize(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb], seed=seed, save=True, load=True, update=True)
     # a.set_trigger_type('so', alter_train=False)
     # a.baseline_prediction()
     exit(0)

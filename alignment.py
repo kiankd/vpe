@@ -32,6 +32,10 @@ def alignment_matrix(sentences, trigger, word2vec_dict, dep_names=('prep','adv',
     remove_idxs(trig_chunks, trigger.wordnum, trigger.wordnum)
 
     for ant in trigger.possible_ants + [trigger.gold_ant]:
+
+        if ant.get_words() == ['get', 'slightly', 'higher', 'yields'] or ant.get_words() == ['get', 'slightly', 'higher', 'yields','on','deposits']:
+            pass
+
         ant_sentdict = sentences.get_sentence(ant.sentnum)
 
         k,l = nearest_clause(ant_sentdict, ant.start-1, end=ant.end-1)
@@ -44,7 +48,6 @@ def alignment_matrix(sentences, trigger, word2vec_dict, dep_names=('prep','adv',
 
         mapping, untrigs, unants = align(trig_chunks, ant_chunks, dep_names, word2vec_dict)
 
-        # TODO: COMMENTED OUT FEATURES TO TEST
         ant.x = np.array([1] + alignment_vector(mapping, untrigs, unants, dep_names, word2vec_dict, verbose=False)
                              + relational_vector(trigger, ant)
                              + avc.ant_trigger_relationship(ant, trigger, sentences, pos_tags)
