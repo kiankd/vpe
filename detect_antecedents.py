@@ -86,7 +86,7 @@ class AntecedentClassifier:
             self.normalize()
         else:
             self.load_imported_data()
-            self.generate_possible_ants(pos_tests, only_filter=False)
+            self.generate_possible_ants(pos_tests, only_filter=False, test_specific=test_specific)
             self.debug_ant_selection()
             self.debug_ant_selection(check_list=self.val_triggers)
             if update:
@@ -172,11 +172,12 @@ class AntecedentClassifier:
             except IndexError:
                 pass
 
-    def generate_possible_ants(self, pos_tests, test=0, delete_random=0.0, only_filter=False):
+    def generate_possible_ants(self, pos_tests, test=0, delete_random=0.0, only_filter=False, test_specific=(None,None)):
         """Generate all candidate antecedents."""
         if not only_filter:
             print 'Generating possible antecedents...'
             bar = ProgBar(len(self.train_triggers)+len(self.val_triggers)+len(self.test_triggers))
+
             if test: # ONLY FOR TESTING! THIS CHEATS!!
                 for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
                     trigger.possible_ants = []
@@ -186,9 +187,10 @@ class AntecedentClassifier:
 
             # Fair.
             for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
-                trigger.possible_ants = []
-                self.sentences.set_possible_ants(trigger, pos_tests)
-                trigger.possible_ants = list(trigger.possible_ants)
+                if not (test_specific[0] and test_specific[1]) or (trigger.sentnum == test_specific[0] and trigger.wordnum == test_specific[1]):
+                    trigger.possible_ants = []
+                    self.sentences.set_possible_ants(trigger, pos_tests)
+                    trigger.possible_ants = list(trigger.possible_ants)
 
                 bar.update()
 
@@ -828,7 +830,7 @@ if __name__ == '__main__':
     else:
         a = AntecedentClassifier(0,14, 15,19, 20,24)
         print 'Debugging...'
-        a.initialize(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb], seed=123, save=False, load=True, update=True)#, test_specific=(14036,14))
+        a.initialize(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb], seed=123, save=False, load=True, update=True, test_specific=(14036,14))
         # a.initialize(pos_tests, save=True, load=True, update=False, seed=2334)
         # a.debug_ant_selection(verbose=False)
         # for trig in a.train_triggers:
