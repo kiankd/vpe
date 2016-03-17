@@ -134,42 +134,42 @@ class AllSentences:
 
             #Lets use the tree to decrease the number of dumb candidates.
 
-            # phrases = [p for p in pos_tests if type(p)==str]
-            # tree = nt.maketree(self.get_sentence(sentnum)['tree'][0])
-            # tree_pos = nt.getsmallestsubtrees(tree)
-            # tree_words = tree.leaves()
-            # leaves_dict = { (tree_pos[i].label(), tree_words[i]) : i+1 for i in range(len(tree_words))}
-            #
-            # new_ants = []
-            # for pos in phrases:
-            #     for position in nt.phrase_positions_in_tree(tree, pos):
-            #         start = None
-            #         for w in nt.getsmallestsubtrees(tree[position]):
-            #             # print w.label(), w[0]
-            #             end = (w.label(), w[0])
-            #
-            #             if not start:
-            #                 start = end
-            #
-            #             if sentnum == trigger.sentnum and leaves_dict[end] == trigger.wordnum or wc.is_punctuation(end[0]):
-            #                 break
-            #
-            #             ant = self.idxs_to_ant(sentnum, leaves_dict[start], leaves_dict[end]+1, trigger)
-            #
-            #             i,j = leaves_dict[start],leaves_dict[end]
-            #             if len(ant.sub_sentdict) > 0 and not ant_after_trigger(sentnum, start, end, trigger)\
-            #                 and not ((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger) in new_ants):
-            #
-            #                 bad = False
-            #                 for pos_check in [wc.is_preposition, wc.is_punctuation]:
-            #                     if pos_check(self.sentences[sentnum].pos[j-1]):
-            #                         bad = True
-            #
-            #                 if not bad:
-            #                     ant = self.idxs_to_ant(sentnum, i, j, trigger)
-            #                     if len(ant.sub_sentdict) > 0:
-            #                         trigger.add_possible_ant(ant)
-            #                         new_ants.append((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger))
+            phrases = [p for p in pos_tests if type(p)==str]
+            tree = nt.maketree(self.get_sentence(sentnum)['tree'][0])
+            tree_pos = nt.getsmallestsubtrees(tree)
+            tree_words = tree.leaves()
+            leaves_dict = { (tree_pos[i].label(), tree_words[i]) : i+1 for i in range(len(tree_words))}
+
+            new_ants = []
+            for pos in phrases:
+                for position in nt.phrase_positions_in_tree(tree, pos):
+                    start = None
+                    for w in nt.getsmallestsubtrees(tree[position]):
+                        # print w.label(), w[0]
+                        end = (w.label(), w[0])
+
+                        if not start:
+                            start = end
+
+                        if sentnum == trigger.sentnum and leaves_dict[end] == trigger.wordnum or wc.is_punctuation(end[0]):
+                            break
+
+                        ant = self.idxs_to_ant(sentnum, leaves_dict[start], leaves_dict[end]+1, trigger)
+
+                        i,j = leaves_dict[start],leaves_dict[end]
+                        if len(ant.sub_sentdict) > 0 and not ant_after_trigger(sentnum, start, end, trigger)\
+                            and not ((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger) in new_ants):
+
+                            bad = False
+                            for pos_check in [wc.is_preposition, wc.is_punctuation]:
+                                if pos_check(self.sentences[sentnum].pos[j-1]):
+                                    bad = True
+
+                            if not bad:
+                                ant = self.idxs_to_ant(sentnum, i, j, trigger)
+                                if len(ant.sub_sentdict) > 0:
+                                    trigger.add_possible_ant(ant)
+                                    new_ants.append((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger))
 
                             # print 'added poss_ant: %d to %d'%(leaves_dict[start], leaves_dict[end]+1),trigger.possible_ants[-1]
 
@@ -662,8 +662,11 @@ class Auxiliary:
         self.possible_ants = []
 
     def __repr__(self):
-        return 'Type: %s, Lemma: %s, Word: %s, POS: %s, Sentnum: %d, Wordnum: %s'\
-              %(self.type,self.lemma,self.word,self.pos,self.sentnum,self.wordnum)
+        if self.is_trigger:
+            return 'TRIGGER - Type: %s, Lemma: %s, Word: %s, POS: %s, Sentnum: %d, Wordnum: %s'\
+                  %(self.type,self.lemma,self.word,self.pos,self.sentnum,self.wordnum)
+        return 'Not Trigger - Type: %s, Lemma: %s, Word: %s, POS: %s, Sentnum: %d, Wordnum: %s'\
+                  %(self.type,self.lemma,self.word,self.pos,self.sentnum,self.wordnum)
 
     def equals(self, aux):
         """ Here we only need to compare the sentnum and wordnum because each auxiliary has a unique combination of these two. """

@@ -77,25 +77,26 @@ class AntecedentClassifier:
         self.diffs = []
         self.train_results, self.val_results, self.test_results = [], [], []
 
-    def initialize(self, pos_tests, seed=1917, W=None, test=0, delete_random=0.0,save=False, load=False, update=False, verbose=False):
+    def initialize(self, pos_tests, seed=1917, W=None, test=0, test_specific=(None,None), save=False, load=False, update=False, verbose=False):
         if not load:
             self.import_data()
             self.generate_possible_ants(pos_tests, test=test, delete_random=delete_random)
             self.debug_ant_selection()
             self.build_feature_vectors()
             self.normalize()
-
         else:
             self.load_imported_data()
-            self.generate_possible_ants(pos_tests, only_filter=True)
+            self.generate_possible_ants(pos_tests, only_filter=False)
             self.debug_ant_selection()
             if update:
+                self.build_feature_vectors(test_specific=test_specific)
                 self.normalize()
 
         if save and load:
             self.generate_possible_ants(pos_tests, test=test, delete_random=delete_random)
             self.debug_ant_selection()
-            self.build_feature_vectors()
+            self.debug_ant_selection(check_list=self.val_triggers)
+            self.build_feature_vectors(test_specific=test_specific)
             self.normalize()
 
         if save:
@@ -174,6 +175,7 @@ class AntecedentClassifier:
         """Generate all candidate antecedents."""
         if not only_filter:
             print 'Generating possible antecedents...'
+            bar = ProgBar(len(self.train_triggers)+len(self.val_triggers)+len(self.test_triggers))
             if test: # ONLY FOR TESTING! THIS CHEATS!!
                 for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
                     trigger.possible_ants = []
@@ -184,12 +186,12 @@ class AntecedentClassifier:
             # Fair.
             for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
                 trigger.possible_ants = []
-
                 self.sentences.set_possible_ants(trigger, pos_tests)
                 trigger.possible_ants = list(trigger.possible_ants)
 
-        if only_filter:
-            print 'Filtering antecedents out...'
+                bar.update()
+
+        print 'Filtering antecedents out...'
 
 
         # Get POS tags that we can use to filter out the antecedents:
@@ -236,13 +238,13 @@ class AntecedentClassifier:
                     c += 1
                     deletes.append(ant)
 
-                elif len(ant.sub_sentdict) > 1 and (ant.sub_sentdict.pos[0],ant.sub_sentdict.pos[1]) in filter_start_combo:
-                    c += 1
-                    deletes.append(ant)
-
-                elif len(ant.sub_sentdict) > 1 and (ant.sub_sentdict.pos[-1],ant.sub_sentdict.pos[-2]) in filter_end_combo:
-                    c += 1
-                    deletes.append(ant)
+                # elif len(ant.sub_sentdict) > 1 and (ant.sub_sentdict.pos[0],ant.sub_sentdict.pos[1]) in filter_start_combo:
+                #     c += 1
+                #     deletes.append(ant)
+                #
+                # elif len(ant.sub_sentdict) > 1 and (ant.sub_sentdict.pos[-1],ant.sub_sentdict.pos[-2]) in filter_end_combo:
+                #     c += 1
+                #     deletes.append(ant)
 
                 elif len(all_ants) == size:
                     duplicates += 1
@@ -268,7 +270,7 @@ class AntecedentClassifier:
 
         return nlargest(k, trigger.possible_ants, key=vpe.Antecedent.get_score)
 
-    def build_feature_vectors(self, verbose=True):
+    def build_feature_vectors(self, verbose=True, test_specific=(None,None)):
 
         word2vec_dict = truth.loadword2vecs()
         all_pos_tags = truth.extract_data_from_file(truth.EACH_UNIQUE_POS_FILE) # We only want to import this file once.
@@ -278,10 +280,11 @@ class AntecedentClassifier:
         bar = ProgBar(len(self.train_triggers)+len(self.val_triggers)+len(self.test_triggers))
 
         for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
-            alignment_matrix(self.sentences, trigger, word2vec_dict,
-                             dep_names= ('prep','nsubj','dobj','nmod','adv','conj','vmod','amod','csubj'),
-                             pos_tags= all_pos_tags)
-            bar.update()
+            if not (test_specific[0] and test_specific[1]) or (test_specific[0] == trigger.sentnum and test_specific[1] == trigger.wordnum):
+                alignment_matrix(self.sentences, trigger, word2vec_dict,
+                                 dep_names= ('prep','nsubj','dobj','nmod','adv','conj','vmod','amod','csubj'),
+                                 pos_tags= all_pos_tags)
+                bar.update()
 
         return
 
@@ -294,7 +297,7 @@ class AntecedentClassifier:
             self.W_old = initial
         self.W_avg = copy(self.W_old)
 
-    def debug_ant_selection(self, verbose=False, write_to_file=None):
+    def debug_ant_selection(self, check_list=None, verbose=False, write_to_file=None):
         missed = 0
         total = 0
         lengths = []
@@ -303,7 +306,8 @@ class AntecedentClassifier:
         if write_to_file:
             f = open(write_to_file, 'w')
 
-        check_list = self.train_triggers
+        if not check_list:
+            check_list = self.train_triggers
 
         for trigger in check_list:
             lengths.append(len(trigger.possible_ants))
@@ -822,9 +826,9 @@ if __name__ == '__main__':
     else:
         a = AntecedentClassifier(0,14, 15,19, 20,24)
         print 'Debugging...'
-        a.initialize(pos_tests, save=True, load=True, update=False, seed=2334)
-        a.debug_ant_selection(verbose=False)
-
+        a.initialize(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb], seed=123, save=False, load=True, update=True, test_specific=(14036,14))
+        # a.initialize(pos_tests, save=True, load=True, update=False, seed=2334)
+        # a.debug_ant_selection(verbose=False)
         # for trig in a.train_triggers:
         #     ant = trig.gold_ant
         #     print '---------------------'
@@ -832,7 +836,7 @@ if __name__ == '__main__':
         #     print ant.sub_sentdict
 
         # a.debug_alignment(verbose=False)
-        exit(0)
+        # exit(0)
         
     sign = lambda x: 1 if x>=0 else -1
     rand_range = 5
@@ -844,11 +848,9 @@ if __name__ == '__main__':
     a = AntecedentClassifier(0,14, 15,19, 20,24)
     seed = 347890 #int(sys.argv[1].split('seed=')[1])
 
-    a.initialize(['VP', wc.is_adjective, wc.is_verb], seed=seed, save=False, load=True, update=False)
+    a.initialize(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb], seed=seed, save=False, load=True, update=True, test_specific=(14036,14))
+    # a.set_trigger_type('so', alter_train=False)
     # a.baseline_prediction()
-    
-    a.set_trigger_type('so', alter_train=False)
-    a.baseline_prediction()
     exit(0)
 
     # np.random.seed(seed)
