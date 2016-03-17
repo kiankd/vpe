@@ -1,5 +1,6 @@
 import nltk
 import copy
+from word_characteristics import is_noun
 # This program is used to do everything I need to do with the nltk.
 
 class NoVPException:
@@ -265,6 +266,10 @@ def get_nearest_vp_exceptional(t, idx, trigger, sentnum):
         for vp in vps:
             if sentnum==trigger.sentnum and vp.treeposition() >= trig_idx[:-1]: # Don't include the last 0
                 to_remove.append(vp) # Get rid of VPs that include the trigger
+
+            # elif not True in map(is_noun, [node.label() for node in getsmallestsubtrees(vp.parent())]):
+            #     to_remove.append(vp)
+
         for badvp in to_remove:
             vps.remove(badvp)
 

@@ -6,6 +6,7 @@ from file_names import Files
 from os import listdir
 from truth import SENTENCE_SEARCH_DISTANCE
 from numpy import dot
+from copy import copy,deepcopy
 
 MODALS = ['can','could','may','must','might','will','would','shall','should']
 BE     = ['be']
@@ -73,6 +74,13 @@ class AllSentences:
     def __getitem__(self, item):
         return self.get_sentence(item)
 
+    def get_all_dependencies(self):
+        deps = set()
+        for sent in self.sentences[:100]:
+            for dep in sent.dependencies:
+                deps.add(dep.name)
+        return deps
+
     def add_mrg(self, mrg_matrix):
         for sentdict in mrg_matrix:
             self.sentences.append(sentdict)
@@ -134,46 +142,54 @@ class AllSentences:
 
             #Lets use the tree to decrease the number of dumb candidates.
 
-            # phrases = [p for p in pos_tests if type(p)==str]
-            # tree = nt.maketree(self.get_sentence(sentnum)['tree'][0])
-            # tree_pos = nt.getsmallestsubtrees(tree)
-            # tree_words = tree.leaves()
-            # leaves_dict = { (tree_pos[i].label(), tree_words[i]) : i+1 for i in range(len(tree_words))}
-            #
-            # new_ants = []
-            # for pos in phrases:
-            #     for position in nt.phrase_positions_in_tree(tree, pos):
-            #         start = None
-            #         for w in nt.getsmallestsubtrees(tree[position]):
-            #             # print w.label(), w[0]
-            #             end = (w.label(), w[0])
-            #
-            #             if not start:
-            #                 start = end
-            #
-            #             if sentnum == trigger.sentnum and leaves_dict[end] == trigger.wordnum or wc.is_punctuation(end[0]):
-            #                 break
-            #
-            #             ant = self.idxs_to_ant(sentnum, leaves_dict[start], leaves_dict[end]+1, trigger)
-            #
-            #             i,j = leaves_dict[start],leaves_dict[end]
-            #             if len(ant.sub_sentdict) > 0 and not ant_after_trigger(sentnum, start, end, trigger)\
-            #                 and not ((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger) in new_ants):
-            #
-            #                 bad = False
-            #                 for pos_check in [wc.is_preposition, wc.is_punctuation]:
-            #                     if pos_check(self.sentences[sentnum].pos[j-1]):
-            #                         bad = True
-            #
-            #                 if not bad:
-            #                     ant = self.idxs_to_ant(sentnum, i, j, trigger)
-            #                     if len(ant.sub_sentdict) > 0:
-            #                         trigger.add_possible_ant(ant)
-            #                         new_ants.append((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger))
+            phrases = [p for p in pos_tests if type(p)==str]
+            tree = nt.maketree(self.get_sentence(sentnum)['tree'][0])
+            tree_pos = nt.getsmallestsubtrees(tree)
+            tree_words = tree.leaves()
+            leaves_dict = { (tree_pos[i].label(), tree_words[i]) : i+1 for i in range(len(tree_words))}
+
+            new_ants = []
+            for pos in phrases:
+                for position in nt.phrase_positions_in_tree(tree, pos):
+                    start = None
+                    for w in nt.getsmallestsubtrees(tree[position]):
+                        # print w.label(), w[0]
+                        end = (w.label(), w[0])
+
+                        if not start:
+                            start = end
+
+                        if sentnum == trigger.sentnum and leaves_dict[end] == trigger.wordnum or wc.is_punctuation(end[0]):
+                            break
+
+                        ant = self.idxs_to_ant(sentnum, leaves_dict[start], leaves_dict[end]+1, trigger)
+
+                        i,j = leaves_dict[start],leaves_dict[end]
+                        if len(ant.sub_sentdict) > 0 and not ant_after_trigger(sentnum, start, end, trigger)\
+                            and not ((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger) in new_ants):
+
+                            bad = False
+                            for pos_check in [wc.is_preposition, wc.is_punctuation]:
+                                if pos_check(self.sentences[sentnum].pos[j-1]):
+                                    bad = True
+
+                            if not bad:
+                                ant = self.idxs_to_ant(sentnum, i, j, trigger)
+                                if len(ant.sub_sentdict) > 0:
+                                    trigger.add_possible_ant(ant)
+                                    new_ants.append((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger))
 
                             # print 'added poss_ant: %d to %d'%(leaves_dict[start], leaves_dict[end]+1),trigger.possible_ants[-1]
 
                     # raise Finished()
+
+    def set_possible_ants2(self, trigger, train_pos_starts_lengths):
+        for sentnum in range(max(0, trigger.sentnum - SENTENCE_SEARCH_DISTANCE), trigger.sentnum+1):
+            for i in range(len(self.sentences[sentnum])):
+                tag = self.sentences[sentnum].pos[i]
+                if tag in train_pos_starts_lengths:
+                    for j in range(i+1, min(len(self.sentences[sentnum]), 99 if sentnum!=trigger.sentnum else trigger.wordnum)):
+                        trigger.add_possible_ant(self.idxs_to_ant(sentnum, i, j, trigger))
 
     def idxs_to_ant(self, sentnum, start, end, trigger):
         sentdict = self.sentences[sentnum]
@@ -498,10 +514,10 @@ class SentDict:
     def get_nltk_tree(self):
         return nt.maketree(self.tree_text[0])
 
-    def chunked_dependencies(self, i, j, dep_names=('prep','adv','dobj','nsubj')):
+    def chunked_dependencies(self, i, j, dep_names=None):
         """Here we will return a list of all relevant dependency clusters between word i and word j."""
-        deps = [dep for dep in self.dependencies if ((i <= dep.gov <= j) and (i <= dep.dependent <= j)
-                                                                         and dep.name in dep_names)]
+        deps = [deepcopy(dep) for dep in self.dependencies if ((i <= dep.gov <= j) and (i <= dep.dependent <= j)
+                                                                         and not dep_names or (dep_names and dep.name in dep_names))]
         # This makes it so that the gov is always the smaller one.
         for dep in deps:
             if dep.gov > dep.dependent:
@@ -662,8 +678,11 @@ class Auxiliary:
         self.possible_ants = []
 
     def __repr__(self):
-        return 'Type: %s, Lemma: %s, Word: %s, POS: %s, Sentnum: %d, Wordnum: %s'\
-              %(self.type,self.lemma,self.word,self.pos,self.sentnum,self.wordnum)
+        if self.is_trigger:
+            return 'TRIGGER - Type: %s, Lemma: %s, Word: %s, POS: %s, Sentnum: %d, Wordnum: %s'\
+                  %(self.type,self.lemma,self.word,self.pos,self.sentnum,self.wordnum)
+        return 'Not Trigger - Type: %s, Lemma: %s, Word: %s, POS: %s, Sentnum: %d, Wordnum: %s'\
+                  %(self.type,self.lemma,self.word,self.pos,self.sentnum,self.wordnum)
 
     def equals(self, aux):
         """ Here we only need to compare the sentnum and wordnum because each auxiliary has a unique combination of these two. """

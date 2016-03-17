@@ -54,6 +54,8 @@ class VPEDetectionClassifier:
         self.features = []
 
         """ Train and test_vectors are lists of csr_matrices in order to save memory. """
+        self.m = None
+        self.m2 = None
         self.train_vectors = []
         self.train_classes = []
         self.test_vectors = []
@@ -130,6 +132,24 @@ class VPEDetectionClassifier:
                 except IndexError:
                     break
 
+    def fix_test_set_triggers(self):
+        """
+        Some triggers annotated by B&S were missed in our data importation step,
+        here we manually set them as actual triggers.
+        """
+        for i,aux in enumerate(self.all_auxiliaries.auxs):
+            if (aux.sentnum,aux.wordnum) in [(12072,39),(10989,30),(11804,12),(11499,11)]:
+                aux.is_trigger = True
+                self.test_classes[i-self.pre_oversample_length] = 1
+
+    def save_classifier(self):
+        a = np.array([self.hyperplane])
+        np.save('vpe_trained_classifier', a)
+
+    def load_classifier(self):
+        a = np.load('vpe_trained_classifier.npy')
+        self.hyperplane = a[0]
+
     def save_data_npy(self, val=False):
         a = np.array([self.gold_standard_auxs, self.annotations, self.sentences, self.all_auxiliaries,
                       self.train_vectors, self.train_classes, self.test_vectors, self.test_classes])
@@ -153,6 +173,7 @@ class VPEDetectionClassifier:
         self.train_classes = a[5]
         self.test_vectors = a[6]
         self.test_classes = a[7]
+        self.pre_oversample_length = len(self.train_vectors)
 
     def normalize(self):
         print 'Normalizing the data...'
@@ -226,10 +247,11 @@ class VPEDetectionClassifier:
 
     def train(self):
         print 'Training the model...'
-        m = self.train_vectors[0]
-        for i in range(1,len(self.train_vectors)):
-            m = vstack((m,self.train_vectors[i]), format='csr')
-        self.hyperplane.fit(m, np.array(self.train_classes))
+        if self.m == None:
+            self.m = self.train_vectors[0]
+            for i in range(1,len(self.train_vectors)):
+                self.m = vstack((self.m,self.train_vectors[i]), format='csr')
+        self.hyperplane.fit(self.m, np.array(self.train_classes))
 
     def make_so(self):
         for aux in self.all_auxiliaries:
@@ -281,53 +303,79 @@ class VPEDetectionClassifier:
             print k, len(d[k])
         print total
 
-    def test(self):
+    def test(self, mat=None):
         print 'Testing the model...'
-        m2 = self.test_vectors[0]
-        for j in range(1,len(self.test_vectors)):
-            m2 = vstack((m2,self.test_vectors[j]), format='csr')
-        self.predictions = self.hyperplane.predict(m2)
+        if mat == None:
+            if self.m2 == None:
+                self.m2 = self.test_vectors[0]
+                for j in range(1,len(self.test_vectors)):
+                    self.m2 = vstack((self.m2,self.test_vectors[j]), format='csr')
+            self.predictions = self.hyperplane.predict(self.m2)
+        else:
+            self.predictions = self.hyperplane.predict(mat)
 
-    def test_my_rules(self, original_rules=False):
+    def test_my_rules(self, original_rules=False, idxs=None):
         self.predictions = []
         print 'Length of test set: %d, length of All_auxs-training vectors: %d'%(len(self.test_classes),len(self.all_auxiliaries)-len(self.train_vectors))
-        for i in range(len(self.train_vectors),len(self.all_auxiliaries)):
-            aux = self.all_auxiliaries.get_aux(i)
-            sendict = self.sentences.get_sentence(aux.sentnum)
-            tree = sendict.get_nltk_tree()
-            word_subtree_positions = nt.get_smallest_subtree_positions(tree)
+        for i in range(self.pre_oversample_length,len(self.all_auxiliaries)):
+            if idxs==None or i in idxs:
+                aux = self.all_auxiliaries.get_aux(i)
+                sendict = self.sentences.get_sentence(aux.sentnum)
+                tree = sendict.get_nltk_tree()
+                word_subtree_positions = nt.get_smallest_subtree_positions(tree)
 
-            if not original_rules:
-                if aux.type == 'modal': self.predictions.append(vc.bool_to_int(wc.modal_rule(sendict, aux, tree, word_subtree_positions)))
-                elif aux.type == 'be': self.predictions.append(vc.bool_to_int(wc.be_rule(sendict, aux)))
-                elif aux.type == 'have': self.predictions.append(vc.bool_to_int(wc.have_rule(sendict, aux)))
-                elif aux.type == 'do': self.predictions.append(vc.bool_to_int(wc.do_rule(sendict, aux, tree, word_subtree_positions)))
-                elif aux.type == 'so': self.predictions.append(vc.bool_to_int(wc.so_rule(sendict, aux)))
-                elif aux.type == 'to': self.predictions.append(vc.bool_to_int(wc.to_rule(sendict, aux)))
-            else:
-                auxidx = aux.wordnum
-                if aux.type == 'modal': self.predictions.append(vc.bool_to_int(dv.modalcheck(sendict, auxidx, tree, word_subtree_positions)))
-                elif aux.type == 'be': self.predictions.append(vc.bool_to_int(dv.becheck(sendict, auxidx, tree, word_subtree_positions)))
-                elif aux.type == 'have': self.predictions.append(vc.bool_to_int(dv.havecheck(sendict, auxidx, tree, word_subtree_positions)))
-                elif aux.type == 'do': self.predictions.append(vc.bool_to_int(dv.docheck(sendict, auxidx, tree, word_subtree_positions)))
-                elif aux.type == 'so': self.predictions.append(vc.bool_to_int(dv.socheck(sendict, auxidx, tree, word_subtree_positions)))
-                elif aux.type == 'to': self.predictions.append(vc.bool_to_int(dv.tocheck(sendict, auxidx, tree, word_subtree_positions)))
+                if not original_rules:
+                    if aux.type == 'modal': self.predictions.append(vc.bool_to_int(wc.modal_rule(sendict, aux, tree, word_subtree_positions)))
+                    elif aux.type == 'be': self.predictions.append(vc.bool_to_int(wc.be_rule(sendict, aux)))
+                    elif aux.type == 'have': self.predictions.append(vc.bool_to_int(wc.have_rule(sendict, aux)))
+                    elif aux.type == 'do': self.predictions.append(vc.bool_to_int(wc.do_rule(sendict, aux, tree, word_subtree_positions)))
+                    elif aux.type == 'so': self.predictions.append(vc.bool_to_int(wc.so_rule(sendict, aux)))
+                    elif aux.type == 'to': self.predictions.append(vc.bool_to_int(wc.to_rule(sendict, aux)))
+                else:
+                    auxidx = aux.wordnum
+                    if aux.type == 'modal': self.predictions.append(vc.bool_to_int(dv.modalcheck(sendict, auxidx, tree, word_subtree_positions)))
+                    elif aux.type == 'be': self.predictions.append(vc.bool_to_int(dv.becheck(sendict, auxidx, tree, word_subtree_positions)))
+                    elif aux.type == 'have': self.predictions.append(vc.bool_to_int(dv.havecheck(sendict, auxidx, tree, word_subtree_positions)))
+                    elif aux.type == 'do': self.predictions.append(vc.bool_to_int(dv.docheck(sendict, auxidx, tree, word_subtree_positions)))
+                    elif aux.type == 'so': self.predictions.append(vc.bool_to_int(dv.socheck(sendict, auxidx, tree, word_subtree_positions)))
+                    elif aux.type == 'to': self.predictions.append(vc.bool_to_int(dv.tocheck(sendict, auxidx, tree, word_subtree_positions)))
 
-    def results(self, name, set_name='Test'):
-        if len(self.predictions) != len(self.test_classes):
+    def results(self, name, set_name='Test', test_classes=None, test_auxs=None, v=False):
+        if test_classes == None:
+            test_classes = self.test_classes
+
+        if test_auxs == None:
+            print 'WOIJOWIRJWOIRJWOIRJWORIQJWRPOWQJRPOWQJRPOJQWRPOQWJR'
+            # test_auxs = self.all_auxiliaries
+
+        if len(self.predictions) != len(test_classes):
             raise Exception('The number of test vectors != the number of test classes!')
 
         result_vector = []
         tp,fp,fn = 0.0,0.0,0.0
-        for i in range(0,len(self.test_classes)):
-            if self.test_classes[i] == self.predictions[i] == vc.bool_to_int(True):
+        for i in range(len(test_classes)):
+            if v:
+                sent = self.sentences.get_sentence(test_auxs[i].sentnum)
+
+            if test_classes[i] == self.predictions[i] == vc.bool_to_int(True):
                 result_vector.append(('tp',i))
+                if v:
+                    print 'TP',sent.file,sent
+                    print test_auxs[i],'\n'
                 tp += 1
-            elif self.test_classes[i] == vc.bool_to_int(True) and self.predictions[i] == vc.bool_to_int(False):
+
+            elif test_classes[i] == vc.bool_to_int(True) and self.predictions[i] == vc.bool_to_int(False):
                 result_vector.append(('fn',i))
+                if v:
+                    print 'FN',sent.file,sent
+                    print test_auxs[i],'\n'
                 fn += 1
-            elif self.test_classes[i] == vc.bool_to_int(False) and self.predictions[i] == vc.bool_to_int(True):
+
+            elif test_classes[i] == vc.bool_to_int(False) and self.predictions[i] == vc.bool_to_int(True):
                 result_vector.append(('fp',i))
+                if v:
+                    print 'FP',sent.file,sent
+                    print test_auxs[i],'\n'
                 fp += 1
 
         try: precision = tp/(tp+fp)
@@ -342,18 +390,12 @@ class VPEDetectionClassifier:
 
         print '\nResults from applying \"%s\" on the %s set.'%(name,set_name)
         print 'TP: %d, FP: %d, FN: %d'%(tp,fp,fn)
-        print 'Precision: %0.2f'%precision
-        print 'Recall: %0.2f'%recall
-        print 'F1: %0.2f\n'%f1
+        print 'Precision: %0.3f'%precision
+        print 'Recall: %0.3f'%recall
+        print 'F1: %0.3f\n'%f1
 
         result_vector += [('precision',precision),('recall',recall), ('f1',f1)]
         self.result_vector = result_vector
-
-    # def vpe_class_based_results(self):
-    #     mats = {'modal':[], 'be':[], 'do':[], 'so':[], 'to':[]}
-    #     for i in range(len(self.train_vectors),len(self.all_auxiliaries)):
-    #         aux = self.all_auxiliaries.get_aux(i)
-    #         mats[aux.type].append(self.test_vectors[i-len(self.train_vectors)])
 
     def log_results(self, file_name):
         train_length = self.pre_oversample_length
@@ -372,12 +414,14 @@ class VPEDetectionClassifier:
                 else:
                     f.write('\n%s: %0.3f\n'%(pair[0],pair[1]))
 
-    def initialize2(self, aux_type=None, rules_test=False):
+    def initialize2(self, aux_type=None, rules_test=False, oversample=5):
         if aux_type:
             self.set_aux_type(aux_type)
 
         if not rules_test:
-            self.oversample(multiplier=5)
+            self.oversample(multiplier=oversample)
+
+
 
 if __name__ == '__main__':
     start_time = time.clock()
@@ -387,7 +431,7 @@ if __name__ == '__main__':
     print features
 
     if len(argv) == 5:
-        c = VPEDetectionClassifier(int(argv[1]),int(argv[2]),int(argv[3]),int(argv[4]))
+        classifier = VPEDetectionClassifier(int(argv[1]),int(argv[2]),int(argv[3]),int(argv[4]))
 
     # c.all_auxiliaries.print_gold_auxiliaries()
 
@@ -403,59 +447,100 @@ if __name__ == '__main__':
     #     print a
 
     # c.file_names.make_all_the_files(c.sentences)
+    classifier = VPEDetectionClassifier(0,14,15,19)
+    OVERSAMPLE = 5
 
+    rules = False
     load = True
+    load_classifier = True
     if not load:
         for t1,t2 in [(15,19),(20,24)]:
-            c = VPEDetectionClassifier(0,14,t1,t2)
-            c.load_data_npy(val=(c.start_test==15 and c.end_test==19), all_data=False) # We only use MRG files.
-            c.set_features(features)
-            c.make_so()
-            c.make_feature_vectors(make_train_vectors=True, make_test_vectors=True, use_old_vectors=False)
-            c.normalize()
-            c.save_data_npy(val=(c.start_test==15 and c.end_test==19))
+            classifier = VPEDetectionClassifier(0,14,t1,t2)
+            classifier.load_data_npy(val=(classifier.start_test==15 and classifier.end_test==19), all_data=False) # We only use MRG files.
+            classifier.set_features(features)
+            classifier.make_so()
+            classifier.make_feature_vectors(make_train_vectors=True, make_test_vectors=True, use_old_vectors=False)
+            classifier.normalize()
+            classifier.save_data_npy(val=(classifier.start_test==15 and classifier.end_test==19))
         print 'Time taken: %0.2f'%(time.clock()-start_time)
         exit(0)
     else:
-        c = VPEDetectionClassifier(0,14,15,19)
-        for type_ in ['']:#,'do']:#['do','to','so','be','modal','have']:
-            for b in [True]:#, False]:
-                c.load_data_npy(val=b, all_data=False)
+        if not load_classifier:
+            classifier.load_data_npy(val=False, all_data=False)
+            classifier.initialize2(rules_test=False, oversample=OVERSAMPLE)
+            classifier.set_classifier(classifier.LOGREGCV)
+            classifier.train()
+            classifier.save_classifier()
+            exit(0)
+        else:
+            classifier.load_classifier()
 
-                # for aux in c.gold_standard_auxs:
-                #     sent = c.sentences.get_sentence(aux.sentnum)
-                #     print sent.file,':',sent
-                # exit(0)
+        for b in [False]:
+            classifier.load_data_npy(val=b, all_data=False)
 
-                c.initialize2(aux_type=type_, rules_test=False)
+            if not b:
+                classifier.fix_test_set_triggers()
 
-                # c.test_my_rules(original_rules=False)
-                # c.results(type_.capitalize()+': Deterministic Rule testing', set_name='Validation' if b else 'Test')
+            if rules:
+                classifier.test_my_rules(original_rules=False)
+                classifier.results('Deterministic Rule testing', set_name='Validation' if b else 'Test', v=False)
+            else:
+                classifier.test()
+                classifier.results('%s oversample %d'%(classifier.LOGREGCV,OVERSAMPLE), set_name='Validation' if b else 'Test', v=False)
 
-                # c.set_classifier(c.LOGREGCV)
-                # c.train()
-                # c.test()
-                # c.results(type_.capitalize()+': %s oversample 5'%c.LOGREGCV, set_name='Validation' if b else 'Test')
-                #
-                # c.set_classifier(c.LINEAR_SVM)
-                # c.train()
-                # c.test()
-                # c.results(type_.capitalize()+': %s oversample 5'%c.LINEAR_SVM, set_name='Validation' if b else 'Test')
+            for t in ['do','to','so','be','modal','have']:
+                auxs = []
+                idxs = []
+                all_aux_idxs = []
+                for i in range(classifier.pre_oversample_length, len(classifier.all_auxiliaries)):
+                    if classifier.all_auxiliaries.get_aux(i).type == t:
+                        auxs.append(classifier.all_auxiliaries.get_aux(i))
+                        idxs.append(i-classifier.pre_oversample_length)
+                        all_aux_idxs.append(i)
 
-                # nu = 0.00
-                # while nu<=1:
-                #     c.set_classifier(NuSVC(nu=nu))
-                #     try:
-                #         print 'NU = ',nu
-                #         c.train()
-                #         c.test()
-                #         c.results(type_.capitalize()+': %s oversample 5'%c.NUSVM, set_name='Validation' if b else 'Test')
-                #     except ValueError:
-                #         print 'Infeasible Nu!!!'
-                #     nu += 0.05
+                print t.upper()
+                if rules:
+                    classifier.test_my_rules(idxs=all_aux_idxs)
+                    classifier.results(t.capitalize()+': rule-based', v=True,
+                                       set_name='Validation' if b else 'Test',
+                                       test_classes=list(np.array(classifier.test_classes)[idxs]),
+                                       test_auxs=list(np.array(classifier.all_auxiliaries.auxs)[all_aux_idxs]))
+                else:
+                    classifier.test(mat=classifier.m2[idxs])
+                    classifier.results(t.capitalize()+': %s oversample 5'%classifier.LOGREGCV, v=True,
+                                       set_name='Validation' if b else 'Test',
+                                       test_classes=list(np.array(classifier.test_classes)[idxs]),
+                                       test_auxs=list(np.array(classifier.all_auxiliaries.auxs)[all_aux_idxs]))
 
 
-                # print '--------------------------------------'
+            # c.set_classifier(c.LINEAR_SVM)
+            # c.train()
+            # c.test()
+            # c.results(type_.capitalize()+': %s oversample 5'%c.LINEAR_SVM, set_name='Validation' if b else 'Test')
+
+            # for C in [0.035]: # BEST HYPER-PARAM FOR LINEAR
+            #     # classifier.set_classifier(SVC(C=C))
+            #     classifier.set_classifier(LinearSVC(C=C))
+            #     print 'C =',C
+            #     classifier.train()
+            #     classifier.test()
+            #     # classifier.results(type_.capitalize()+': %s oversample 5'%classifier.SVM, set_name='Validation' if b else 'Test')
+            #     classifier.results(type_.capitalize()+': %s oversample 5'%classifier.LINEAR_SVM, set_name='Validation' if b else 'Test')
+
+            # nu = 0.00
+            # while nu<=1:
+            #     c.set_classifier(NuSVC(nu=nu))
+            #     try:
+            #         print 'NU = ',nu
+            #         c.train()
+            #         c.test()
+            #         c.results(type_.capitalize()+': %s oversample 5'%c.NUSVM, set_name='Validation' if b else 'Test')
+            #     except ValueError:
+            #         print 'Infeasible Nu!!!'
+            #     nu += 0.05
+
+
+            print '--------------------------------------'
 
     # MRG data set: test - 80 P, 89 R
     # MRG data set: vali - xx P, xx R
@@ -470,47 +555,29 @@ if __name__ == '__main__':
     # FULL Modal val xx p xx r , modal test xx p, xx r
     # FULL My Rules: Val 67 p, 64 r; test 66 p, 70 r
 
-
-    # c.oversample(multiplier=5)
-
-    # c.set_classifier(c.RANDOMFOREST)
-    # c.train()
-    # c.test()
-    # c.results('%s oversample 5'%c.RANDOMFOREST)
-    # c.log_results('RANDOMFOREST_normalized_100estimators_4minsamplesleaf_all_features_old_rules_oversamplex5')
-    # c.log_results('logregcv_normalized_all_features_old_rules_oversamplex5')
-
-    # c.set_classifier(c.ADABOOST)
-    # c.train()
-    # c.test()
-    # c.results('%s oversample 5'%c.ADABOOST)
-    # c.log_results('ADABOOST_500estimators_all_features_old_rules_oversamplex5')
-
     def test():
-        c.set_classifier(c.LINEAR_SVM)
-        c.train()
-        c.test()
-        c.results('%s normalized oversample 5'%c.LINEAR_SVM)
+        classifier.set_classifier(classifier.LINEAR_SVM)
+        classifier.train()
+        classifier.test()
+        classifier.results('%s normalized oversample 5'%classifier.LINEAR_SVM)
 
-        c.set_classifier(c.SVM)
-        c.train()
-        c.test()
-        c.results('%s normalized oversample 5'%c.SVM)
+        classifier.set_classifier(classifier.SVM)
+        classifier.train()
+        classifier.test()
+        classifier.results('%s normalized oversample 5'%classifier.SVM)
 
-        c.set_classifier(c.DECISION_TREE)
-        c.train()
-        c.test()
-        c.results('%s normalized oversample 5'%c.DECISION_TREE)
+        classifier.set_classifier(classifier.DECISION_TREE)
+        classifier.train()
+        classifier.test()
+        classifier.results('%s normalized oversample 5'%classifier.DECISION_TREE)
 
-        c.set_classifier(c.DECISION_TREE_WITH_OPTIONS)
-        c.train()
-        c.test()
-        c.results('%s normalized oversample 5'%c.DECISION_TREE_WITH_OPTIONS)
+        classifier.set_classifier(classifier.DECISION_TREE_WITH_OPTIONS)
+        classifier.train()
+        classifier.test()
+        classifier.results('%s normalized oversample 5'%classifier.DECISION_TREE_WITH_OPTIONS)
 
-        c.set_classifier(c.NAIVE_BAYES)
-        c.train()
-        c.test()
-        c.results('%s normalized oversample 5'%c.NAIVE_BAYES)
-
-    # test()
+        classifier.set_classifier(classifier.NAIVE_BAYES)
+        classifier.train()
+        classifier.test()
+        classifier.results('%s normalized oversample 5'%classifier.NAIVE_BAYES)
 

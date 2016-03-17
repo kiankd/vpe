@@ -59,7 +59,7 @@ def is_predicative(tag):
     return 'PRD' in tag
 
 def is_noun(tag):
-    return tag in ['NN','NNS','NNP','NNPS','WP','PRP','PRP$','DT']
+    return tag in ['NN','NNS','NNP','NNPS','WP','PRP','PRP$','DT'] or tag.startswith('NN')
 
 def is_adverb(tag):
     return tag == 'RB'
