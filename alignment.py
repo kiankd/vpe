@@ -29,6 +29,7 @@ def alignment_matrix(sentences, trigger, word2vec_dict, dep_names=('prep','adv',
 
     i,j = nearest_clause(trig_sentdict, trigger.wordnum-1) # WE NEED TO SUBTRACT BY ONE BECAUSE NO ROOT IN TREES
     trig_chunks = trig_sentdict.chunked_dependencies(i, j, dep_names=dep_names)
+    
     remove_idxs(trig_chunks, trigger.wordnum, trigger.wordnum)
 
     for ant in trigger.possible_ants + [trigger.gold_ant]:
@@ -40,8 +41,8 @@ def alignment_matrix(sentences, trigger, word2vec_dict, dep_names=('prep','adv',
 
         k,l = nearest_clause(ant_sentdict, ant.start-1, end=ant.end-1)
 
-        if ant.sentnum == trigger.sentnum and k < l:
-            l = min(l, i) # we don't want the nearest clause to include the trigger's clause.
+        # if ant.sentnum == trigger.sentnum and k < l:
+        #     l = min(l, i) # we don't want the nearest clause to include the trigger's clause.
 
         ant_chunks = ant_sentdict.chunked_dependencies(k, l, dep_names=dep_names)
 
@@ -54,8 +55,9 @@ def alignment_matrix(sentences, trigger, word2vec_dict, dep_names=('prep','adv',
 
         ant.x = np.array([1] + alignment_vector(mapping, untrigs, unants, dep_names, word2vec_dict, verbose=False)
                              + relational_vector(trigger, ant)
-                             + avc.ant_trigger_relationship(ant, trigger, sentences, pos_tags)
-                             + hardt_features(ant, trigger, sentences, pos_tags))
+                             + avc.ant_trigger_relationship(ant, trigger, sentences, pos_tags, word2vec_dict)
+                             + hardt_features(ant, trigger, sentences, pos_tags)
+                        )
 
     # print 'Avg mapping, trig_chunks, ant_chunks lengths: %0.2f, %d, %0.2f'\
     #       %(np.mean(MAPPING_LENGTHS), len(trig_chunks),np.mean(ANT_CHUNK_LENGTHS))
@@ -363,8 +365,10 @@ def similarity_score(c1, c2, word2vec_dict, words_weight=0.2, pos_weight=0.5, le
 
     if c1['name'] == c2['name'] == 'nsubj':
         score += 1.5
+        if True in map(wc.is_noun, c1['sentdict'].pos) and True in map(wc.is_noun, c2['sentdict'].pos):
+            score += 1.5
 
-    elif c1['name'] == c2['name']:
+    elif c1['name'].startswith(c2['name']) or c2['name'].startswith(c1['name']):
         score += 3.0
 
     score += f1_similarity(c1['sentdict'].words, c2['sentdict'].words) * words_weight

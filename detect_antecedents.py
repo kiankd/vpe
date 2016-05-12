@@ -16,7 +16,7 @@ from random import randrange,sample
 from matplotlib import pyplot as plt
 from alignment import alignment_matrix
 from copy import copy
-
+from sklearn.preprocessing import StandardScaler
 from subprocess import call
 call('clear')
 
@@ -94,8 +94,8 @@ class AntecedentClassifier:
             #     self.normalize()
 
         if update:
-            # self.generate_possible_ants(pos_tests, test=test)
-            self.generate_possible_ants2()
+            # self.generate_possible_ants(pos_tests, test=test, strong=False)
+            # self.generate_possible_ants2()
             self.debug_ant_selection()
             self.debug_ant_selection(check_list=self.val_triggers)
             self.build_feature_vectors(test_specific=test_specific)
@@ -293,7 +293,7 @@ class AntecedentClassifier:
 
         print 'Building feature vectors...'
 
-        dep_names = ('prep','nsubj','dobj','nmod','adv','conj','vmod','amod','csubj')#self.sentences.get_all_dependencies()
+        dep_names = ('prep','nsubj','dobj','nmod','adv','conj','vmod','amod','csubj')
         print len(dep_names),dep_names
 
         bar = ProgBar(len(self.train_triggers)+len(self.val_triggers)+len(self.test_triggers))
@@ -393,25 +393,10 @@ class AntecedentClassifier:
                 xtest.append(ant.x)
             xtest.append(trig.gold_ant.x)
 
-        X = np.array(xtrain + xval + xtest)
-        X = X[:, (X == 0).sum(axis=0) <= len(X)-1] # Remove 0 columns
-
-        xtrain = np.array(X[:len(xtrain)])
-        xval = np.array(X[len(xtrain):len(xtrain)+len(xval)])
-        xtest = np.array(X[len(xtrain)+len(xval):])
-
-        mean = xtrain.mean(axis=0)
-        xtrain -= mean
-        xval -= mean
-        xtest -= mean
-
-        stdtrain = xtrain.std(axis=0)[1:]
-        for v in [np.NAN, np.inf, 0.0]:
-            stdtrain[stdtrain == v] = 1.0
-
-        xtrain[:,1:] /= stdtrain # Standard deviation of bias is zero, dont divide it.
-        xval[:,1:] /= stdtrain
-        xtest[:,1:] /= stdtrain
+        s = StandardScaler()
+        xtrain = s.fit_transform(xtrain)
+        xval = s.transform(xval)
+        xtest = s.transform(xtest)
 
         i=0
         for trig in self.train_triggers:
@@ -474,6 +459,9 @@ class AntecedentClassifier:
             if not has:
                 trig.possible_ants.append(trig.gold_ant)
 
+        best_score = 0.0
+        best_weights = []
+
         i=0
         for n in range(epochs):
             for trigger in shuffle(self.train_triggers):
@@ -512,7 +500,12 @@ class AntecedentClassifier:
                 print '\tTrain/val/test HeadO: %0.2f, %0.2f, %0.2f'\
                       %(self.train_results[-1][2], self.val_results[-1][2], self.test_results[-1][2])
 
+                if self.val_results[-1][1] > best_score:
+                    best_score = self.val_results[-1][1]
+                    best_weights = [copy(self.W_avg)]
 
+                elif self.val_results[-1][1] == best_score:
+                    best_weights.append(copy(self.W_avg))
 
                 # print 'Trigger sentnum,wordnum: %d,%d'%(trigger.sentnum,trigger.wordnum)
                 # print self.sentences.get_sentence(trigger.sentnum)
@@ -528,10 +521,18 @@ class AntecedentClassifier:
         self.val_results = np.array(self.val_results)
         self.test_results = np.array(self.test_results)
 
-        # final results
-        best_idx = self.val_results[:,1].argmax()
-        print 'Best validation head match - %0.2f'%self.val_results[:,1][best_idx]
-        print 'This gives us the following test head match - %0.2f'%self.test_results[:,1][best_idx]
+        best_weight_vector = np.mean(best_weights, axis=0)
+        self.W_avg = best_weight_vector
+
+        val_preds = self.predict(self.val_triggers)
+        test_preds = self.predict(self.test_triggers)
+
+        print 'Validation score using best weight vector: %0.3f'%self.criteria_based_results(val_preds)[1]
+        print 'Test score using best validation weight vector: %0.3f'%self.criteria_based_results(test_preds)[1]
+
+        # best_idx = self.val_results[:,1].argmax()
+        # print 'Best validation head match - %0.3f'%self.val_results[:,1][best_idx]
+        # print 'This gives us the following test head match - %0.3f'%self.test_results[:,1][best_idx]
 
     def predict(self, trigger_list):
         predictions = []
@@ -548,8 +549,8 @@ class AntecedentClassifier:
         # weigh the "head" - the first word of the gold_ant
         # more than the rest of the words.
 
-        # if not gold_ant.get_head() == proposed_ant.get_head():
-        #    return 1.0
+        if not gold_ant.get_head() in proposed_ant.get_words():
+           return 1.0
 
         gold_vals = gold_ant.get_words()
         proposed_vals = proposed_ant.get_words()
@@ -673,13 +674,13 @@ class AntecedentClassifier:
 
         plt.figure(5)
         ax = plt.subplot(111)
-        plt.title('Head match results over time')
+        # plt.title('Head match results over time')
         ax.plot(range(len(self.train_results)), self.train_results[:,1], 'b-', label='Train')
         ax.plot(range(len(self.val_results)), self.val_results[:,1], 'y-', label='Validation')
         ax.plot(range(len(self.test_results)), self.test_results[:,1], 'r-', label='Test')
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        ax.legend(loc='best')#, bbox_to_anchor=(1, 0.5))
         plt.savefig(params+'results.png', bbox_inches='tight')
         plt.clf()
 
@@ -735,8 +736,10 @@ class AntecedentClassifier:
 
     def load_imported_data(self, name=''):
         print 'Loading the data...'
-        folder = self.file_names.IMPORTED_DATA+name
-        data = np.load(self.file_names.IMPORTED_DATA)
+        if 'orig' in sys.argv:
+            data = np.load('/home/2014/kkenyo1/vpe_project/npy_data/BEST_RESULTS_SO_FAR_imported_data.npy')
+        else:
+            data = np.load(self.file_names.IMPORTED_DATA)
         self.sentences = data[0]
         self.train_triggers = data[1]
         self.val_triggers = data[2]
@@ -752,7 +755,7 @@ class AntecedentClassifier:
             except IndexError:
                 pass
 
-    def set_trigger_type(self, type_, alter_train=False):
+    def set_trigger_type(self, type_, alter_train=False, alter_test=True):
         """
         We use this if we want to see how the algorithm performs when it only trains and tests
         on one type of trigger, i.e. "do".
@@ -761,13 +764,14 @@ class AntecedentClassifier:
         if alter_train:
             self.train_triggers = [trig for trig in self.train_triggers if trig.type == type_]
         
-        old_len = len(self.val_triggers)
-        self.val_triggers = [trig for trig in self.val_triggers if trig.type == type_]
-        print 'Frequency of %s in validation: %d out of a total of %d.'%(type_, len(self.val_triggers), old_len)
+        if alter_test:
+            old_len = len(self.val_triggers)
+            self.val_triggers = [trig for trig in self.val_triggers if trig.type == type_]
+            print 'Frequency of %s in validation: %d out of a total of %d.'%(type_, len(self.val_triggers), old_len)
 
-        old_len = len(self.test_triggers)
-        self.test_triggers = [trig for trig in self.test_triggers if trig.type == type_]
-        print 'Frequency of %s in test: %d out of a total of %d.'%(type_, len(self.test_triggers), old_len)
+            old_len = len(self.test_triggers)
+            self.test_triggers = [trig for trig in self.test_triggers if trig.type == type_]
+            print 'Frequency of %s in test: %d out of a total of %d.'%(type_, len(self.test_triggers), old_len)
 
         print len(self.train_triggers), len(self.val_triggers), len(self.test_triggers)
 
@@ -856,9 +860,9 @@ if __name__ == '__main__':
         a = AntecedentClassifier(0,14, 15,19, 20,24)
         print 'Debugging...'
         if 'align' in sys.argv:
-            a.initialize(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb], seed=123, save=True, load=True, update=True, test_specific=(14036,14))
+            a.initialize(pos_tests, seed=123, save=True, load=True, update=True, test_specific=(14036,14))
         else:
-            a.initialize(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb], seed=123, save=True, load=True, update=True)           
+            a.initialize(pos_tests, seed=123, save=True, load=True, update=True)           
         # a.initialize(pos_tests, save=True, load=True, update=False, seed=2334)
         # a.debug_ant_selection(verbose=False)
         # for trig in a.train_triggers:
@@ -873,15 +877,16 @@ if __name__ == '__main__':
     sign = lambda x: 1 if x>=0 else -1
     rand_range = 5
     a = AntecedentClassifier(0,14, 15,19, 20,24)
-    seed = 347890 #int(sys.argv[1].split('seed=')[1])
+    seed = 347890 #int(sys.argv[1].split('seed=')[1]) #347890
 
 
-    a.initialize(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb], seed=seed, save=False, load=True, update=False)
-    a.debug_ant_selection(a.train_triggers)
-    a.debug_ant_selection(a.val_triggers)
-    # a.debug_ant_selection(a.test_triggers)
-    # a.set_trigger_type('so', alter_train=False)
-    # a.baseline_prediction()
+    a.initialize(pos_tests, seed=seed, save=False, load=True, update=False)
+    # a.generate_possible_ants(pos_tests, only_filter=True, strong=True)
+    # a.normalize()
+    # a.debug_ant_selection(a.train_triggers)
+    # a.debug_ant_selection(a.val_triggers)
+    # a.set_trigger_type('do', alter_train=True)
+    a.baseline_prediction()
     # exit(0)
 
     # np.random.seed(seed)
@@ -894,6 +899,8 @@ if __name__ == '__main__':
 
 
     # 81% val HM, 82% test HM when gold_ant added to Val and Test (cheatily)
+    # This was just used to see how it does with gold standard in, and it does do better
+    # which is why we are motivated to improve recall of candidate antecedent generation.
     if 'cheat' in sys.argv:
         print 'Cheating!!'
         for trig in a.val_triggers + a.test_triggers:
@@ -907,21 +914,18 @@ if __name__ == '__main__':
 
     lr = 0.01
     K = 5
-    a.C = 5.0
+    a.C = 7.0
     a.learn_rate = lambda x: lr #if x == 0 or x % 25 else lr**(x/25)
-
+    # do_weights = 'saved_weights/DO_ULTIMATE_RESULTS_c%s_lr%s_k%s'%(str(a.C),str(lr),str(K))
+    # a.W_avg = np.load(do_weights+'.npy')
 
     # name = 'RANDOMNESS_results_by_trig_c%s_lr%s_k%s_randrange%s_'%(str(a.C),str(lr),str(K),str(rand_range))
-    name = 'SUPER_FINAL_RESULTS_by_trig_c%s_lr%s_k%s'%(str(a.C),str(lr),str(K))
-    print '\nLEARN RATE, C, K, seed:', lr, a.C, K, seed
+    name = 'ALL_ULTIMATE_RESULTS_c%s_lr%s_k%s'%(str(a.C),str(lr),str(K))
 
 
-    a.fit(epochs=3, k=K, verbose=True)
+    a.fit(epochs=2, k=K, verbose=True)
     # a.make_graphs(name)
     # a.log_results(name)
-    # a.reset()
-    # a.initialize_weights(seed=347890)
-
     # np.save('saved_weights/'+name, np.array(a.W_avg))
     print '\nLEARN RATE, C, K, seed:', lr, a.C, K, seed
 

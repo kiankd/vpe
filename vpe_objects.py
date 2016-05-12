@@ -78,7 +78,8 @@ class AllSentences:
         deps = set()
         for sent in self.sentences[:100]:
             for dep in sent.dependencies:
-                deps.add(dep.name)
+                if not ':' in dep.name:
+                    deps.add(dep.name)
         return deps
 
     def add_mrg(self, mrg_matrix):
@@ -142,42 +143,42 @@ class AllSentences:
 
             #Lets use the tree to decrease the number of dumb candidates.
 
-            phrases = [p for p in pos_tests if type(p)==str]
-            tree = nt.maketree(self.get_sentence(sentnum)['tree'][0])
-            tree_pos = nt.getsmallestsubtrees(tree)
-            tree_words = tree.leaves()
-            leaves_dict = { (tree_pos[i].label(), tree_words[i]) : i+1 for i in range(len(tree_words))}
+            # phrases = [p for p in pos_tests if type(p)==str]
+            # tree = nt.maketree(self.get_sentence(sentnum)['tree'][0])
+            # tree_pos = nt.getsmallestsubtrees(tree)
+            # tree_words = tree.leaves()
+            # leaves_dict = { (tree_pos[i].label(), tree_words[i]) : i+1 for i in range(len(tree_words))}
 
-            new_ants = []
-            for pos in phrases:
-                for position in nt.phrase_positions_in_tree(tree, pos):
-                    start = None
-                    for w in nt.getsmallestsubtrees(tree[position]):
-                        # print w.label(), w[0]
-                        end = (w.label(), w[0])
+            # new_ants = []
+            # for pos in phrases:
+            #     for position in nt.phrase_positions_in_tree(tree, pos):
+            #         start = None
+            #         for w in nt.getsmallestsubtrees(tree[position]):
+            #             # print w.label(), w[0]
+            #             end = (w.label(), w[0])
 
-                        if not start:
-                            start = end
+            #             if not start:
+            #                 start = end
 
-                        if sentnum == trigger.sentnum and leaves_dict[end] == trigger.wordnum or wc.is_punctuation(end[0]):
-                            break
+            #             if sentnum == trigger.sentnum and leaves_dict[end] == trigger.wordnum or wc.is_punctuation(end[0]):
+            #                 break
 
-                        ant = self.idxs_to_ant(sentnum, leaves_dict[start], leaves_dict[end]+1, trigger)
+            #             ant = self.idxs_to_ant(sentnum, leaves_dict[start], leaves_dict[end]+1, trigger)
 
-                        i,j = leaves_dict[start],leaves_dict[end]
-                        if len(ant.sub_sentdict) > 0 and not ant_after_trigger(sentnum, start, end, trigger)\
-                            and not ((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger) in new_ants):
+            #             i,j = leaves_dict[start],leaves_dict[end]
+            #             if len(ant.sub_sentdict) > 0 and not ant_after_trigger(sentnum, start, end, trigger)\
+            #                 and not ((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger) in new_ants):
 
-                            bad = False
-                            for pos_check in [wc.is_preposition, wc.is_punctuation]:
-                                if pos_check(self.sentences[sentnum].pos[j-1]):
-                                    bad = True
+            #                 bad = False
+            #                 for pos_check in [wc.is_preposition, wc.is_punctuation]:
+            #                     if pos_check(self.sentences[sentnum].pos[j-1]):
+            #                         bad = True
 
-                            if not bad:
-                                ant = self.idxs_to_ant(sentnum, i, j, trigger)
-                                if len(ant.sub_sentdict) > 0:
-                                    trigger.add_possible_ant(ant)
-                                    new_ants.append((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger))
+            #                 if not bad:
+            #                     ant = self.idxs_to_ant(sentnum, i, j, trigger)
+            #                     if len(ant.sub_sentdict) > 0:
+            #                         trigger.add_possible_ant(ant)
+            #                         new_ants.append((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger))
 
                             # print 'added poss_ant: %d to %d'%(leaves_dict[start], leaves_dict[end]+1),trigger.possible_ants[-1]
 
@@ -516,8 +517,21 @@ class SentDict:
 
     def chunked_dependencies(self, i, j, dep_names=None):
         """Here we will return a list of all relevant dependency clusters between word i and word j."""
-        deps = [deepcopy(dep) for dep in self.dependencies if ((i <= dep.gov <= j) and (i <= dep.dependent <= j)
-                                                                         and not dep_names or (dep_names and dep.name in dep_names))]
+        deps = [deepcopy(dep) for dep in self.dependencies if (i <= dep.gov <= j) and (i <= dep.dependent <= j)]
+        remove = set()
+        for dep in deps:
+            got = False
+            for depname in dep_names:
+                if dep.name.startswith(depname):
+                    got=True
+                    break
+            if not got:
+                remove.add(dep)
+        
+        for dep in remove:
+            deps.remove(dep)
+
+
         # This makes it so that the gov is always the smaller one.
         for dep in deps:
             if dep.gov > dep.dependent:
@@ -527,16 +541,16 @@ class SentDict:
 
         deps.sort(key=attrgetter('gov'))
 
-        # Here we are removing overlap by making earlier dependency chunks end by at most the index of the next start.
-        last_start = -1
-        last_stop = -1
-        for c in range(len(deps)):
-            dep = deps[c]
+        #Here we are removing overlap by making earlier dependency chunks end by at most the index of the next start.
+        # last_start = -1
+        # last_stop = -1
+        # for c in range(len(deps)):
+        #     dep = deps[c]
 
-            if not dep.gov > last_stop:
-                deps[c-1].dependent = dep.gov-1
+        #     if not dep.gov > last_stop:
+        #         deps[c-1].dependent = dep.gov-1
 
-            last_stop = dep.dependent
+        #     last_stop = dep.dependent
 
         # Here we get the dependency constituents for each desired dependency in dep_names.
         chunks = []
@@ -546,7 +560,7 @@ class SentDict:
                                                                      self.lemmas[k:p], start=k, end=p)} )
 
         if len(chunks) == 0:
-            chunks.append( {'name':None, 'sentdict':SubSentDict( self.words[i-1:i], self.pos[i-1:i],
+            chunks.append( {'name':'None', 'sentdict':SubSentDict( self.words[i-1:i], self.pos[i-1:i],
                                                                  self.lemmas[i-1:i], start=i-1, end=i)} )
 
         return chunks
@@ -705,7 +719,6 @@ class Auxiliary:
         elif lemma in SO: return 'so'
         else:
             raise AuxiliaryHasNoTypeException(lemma)
-
 
 class RawAuxiliary:
     """ Only exists for extracting the annotations from the raw XML files. """

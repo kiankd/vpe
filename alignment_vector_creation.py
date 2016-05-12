@@ -9,7 +9,7 @@ import math
 # Purpose: to generate feature vectors according to an alignment of comparing the environment of a possible antecedent to
 # the surrounding environment of the trigger.
 
-def make_alignment_vector(trig_sentdict, ant_sentdict, ant, trigger, POS_TAGS, AUX_WORDS, word2vec_dict, unique_patterns):
+def make_alignment_vector(trig_sentdict, ant_sentdict, ant, trigger, POS_TAGS, AUX_WORDS, word2vec_dict, unique_patterns=False):
     vec = antecedent_description(trig_sentdict, ant_sentdict, ant, POS_TAGS)
     vec += trigger_description(trig_sentdict, ant_sentdict, trigger, POS_TAGS, AUX_WORDS)
     vec += alignment_comparison(trig_sentdict, ant_sentdict, ant, trigger, word2vec_dict)
