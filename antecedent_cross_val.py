@@ -20,6 +20,7 @@ def cross_validate(k_fold=5):
     kf = KFold(len(all_trigs), n_folds=k_fold, shuffle=True, random_state=1917)
 
     accs = []
+    baseline_accs = []
     for train_idxs, test_idxs in kf:
         train = all_trigs[train_idxs]
         test = all_trigs[test_idxs]
@@ -37,8 +38,14 @@ def cross_validate(k_fold=5):
         val_acc, test_acc = ac.fit()
         accs.append((val_acc, test_acc))
 
-    print 'Average val accuracy: ',np.mean([t[0] for t in accs])
-    print 'Average test accuracy: ',np.mean([t[1] for t in accs])
+        bval_acc, btest_acc = ac.baseline_prediction()
+        baseline_accs.append((bval_acc, btest_acc))
+
+    for lst in (baseline_accs, accs):
+        print 'MIRA RESULTS' if lst == accs else 'BASLINE RESULTS'
+        print 'Average val accuracy: ',np.mean([t[0] for t in lst])
+        print 'Average test accuracy: ',np.mean([t[1] for t in lst])
+        print
 
 if __name__ == '__main__':
     cross_validate()

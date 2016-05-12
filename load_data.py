@@ -75,24 +75,6 @@ class Dataset(object):
     def get_aux_classifications(self):
         return [1 if aux.is_trigger else 0 for aux in self.auxs]
 
-    @staticmethod
-    def oversample(x, y, multiplier=5):
-        assert len(x) == len(y)
-
-        new_x = []
-        new_y = []
-        for i in range(len(x)):
-            if y[i] == 1:
-                for _ in range(multiplier):
-                    new_x.append(x[i])
-                    new_y.append(y[i])
-            else:
-                new_x.append(x[i])
-                new_y.append(y[i])
-
-        assert len(new_x) == len(new_y)
-        return new_x, new_y
-
     def run_cross_validation(self, X, Y, model, k_fold=5, oversample=1, verbose=False, check_fp=False, rand=1917):
         if verbose: print 'Performing cross-validation...'
         model_name = type(model).__name__
@@ -158,6 +140,24 @@ class Dataset(object):
             print 'Precision: %0.2f'%np.mean([t[0] for t in lst])
             print 'Recall: %0.2f'%np.mean([t[1] for t in lst])
             print 'F1: %0.2f'%np.mean([t[2] for t in lst])
+
+    @staticmethod
+    def oversample(x, y, multiplier=5):
+        assert len(x) == len(y)
+
+        new_x = []
+        new_y = []
+        for i in range(len(x)):
+            if y[i] == 1:
+                for _ in range(multiplier):
+                    new_x.append(x[i])
+                    new_y.append(y[i])
+            else:
+                new_x.append(x[i])
+                new_y.append(y[i])
+
+        assert len(new_x) == len(new_y)
+        return new_x, new_y
 
     @classmethod
     def load_dataset(cls):

@@ -812,6 +812,9 @@ class AntecedentClassifier(object):
         print '\tVal: ', self.criteria_based_results(val_ant_pred)
         print '\tTest: ', self.criteria_based_results(test_ant_pred)
 
+        # return head match % for validation and test results
+        return self.criteria_based_results(val_ant_pred)[1], self.criteria_based_results(test_ant_pred)[2]
+
     def gold_analysis(self):
         print 'Triggers:',
         freq = {}
