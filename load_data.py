@@ -93,14 +93,14 @@ class Dataset(object):
         assert len(new_x) == len(new_y)
         return new_x, new_y
 
-    def run_cross_validation(self, X, Y, model, k_fold=5, oversample=1, verbose=False, check_fp=False):
+    def run_cross_validation(self, X, Y, model, k_fold=5, oversample=1, verbose=False, check_fp=False, rand=1917):
         if verbose: print 'Performing cross-validation...'
         model_name = type(model).__name__
 
         train_results = []
         test_results = []
 
-        kf = KFold(len(X), n_folds=k_fold, shuffle=True, random_state=1917)
+        kf = KFold(len(X), n_folds=k_fold, shuffle=True, random_state=rand)
 
         assert len(X) == len(Y)
 
@@ -274,8 +274,10 @@ if __name__ == '__main__':
     # data.serialize()
     data = Dataset.load_dataset()
 
-    for type_ in ['do','to','modal','have','be']:
+    for type_ in ['do']:#,'do','to','modal','have','be']:
         type_x, type_y = data.get_auxs_by_type(type_)
         for model in [LogisticRegressionCV()]:#[LogisticRegression(), LogisticRegressionCV(), SVC(), LinearSVC()]:
-            data.run_cross_validation(type_x, type_y, model, oversample=5, check_fp=False)
-            print '------------------------------------------'
+            for rand in range(0,100000,505):
+                print rand
+                data.run_cross_validation(type_x, type_y, model, oversample=5, check_fp=False, rand=rand)
+                print '------------------------------------------'
