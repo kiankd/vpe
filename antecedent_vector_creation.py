@@ -57,7 +57,6 @@ def ant_trigger_relationship(ant, trigger, sentences, all_tags, word2vec_dict):
         v.append(0.0)
         v.append(0.0)
 
-
     # Comparing the word that comes before the antecedent to the trigger word.
     if ant.start != 0:
         v.append(1.0)

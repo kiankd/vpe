@@ -156,7 +156,6 @@ def my_features_vector(sentdict, aux, tree, subtree_positions):
               bool_to_int(wc.aux_locally_ccommanded_by_verb(sentdict, aux, tree, subtree_positions)),
               bool_to_int(wc.aux_locally_ccommands_verb(sentdict, aux, tree, subtree_positions)),
               bool_to_int(wc.is_ccommanded_by_continuation_word(sentdict, aux, tree, subtree_positions)),
-              bool_to_int(wc.is_ccommanded_by_continuation_word(sentdict, aux, tree, subtree_positions)),
               bool_to_int(wc.next_to_punct(sentdict, aux)),
               bool_to_int(wc.previous_word_is_continuation_word(sentdict, aux)),
               bool_to_int(wc.the_same_check(sentdict, aux)),

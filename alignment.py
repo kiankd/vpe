@@ -56,8 +56,7 @@ def alignment_matrix(sentences, trigger, word2vec_dict, dep_names=('prep','adv',
         ant.x = np.array([1] + alignment_vector(mapping, untrigs, unants, dep_names, word2vec_dict, verbose=False)
                              + relational_vector(trigger, ant)
                              + avc.ant_trigger_relationship(ant, trigger, sentences, pos_tags, word2vec_dict)
-                             + hardt_features(ant, trigger, sentences, pos_tags)
-                        )
+                             + hardt_features(ant, trigger, sentences, pos_tags))
 
     # print 'Avg mapping, trig_chunks, ant_chunks lengths: %0.2f, %d, %0.2f'\
     #       %(np.mean(MAPPING_LENGTHS), len(trig_chunks),np.mean(ANT_CHUNK_LENGTHS))

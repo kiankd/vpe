@@ -24,10 +24,12 @@ def shuffle(list_):
     np.random.shuffle(list_)
     return list_
 
-class AntecedentClassifier:
+
+class AntecedentClassifier(object):
     SCHEDULE_FREQUENCY = 10
 
-    def __init__(self, train_start, train_end, val_start, val_end, test_start, test_end, learn_rate=lambda x: 1.0/(x+1), C=1.0):
+    def __init__(self, train_start, train_end, val_start, val_end, test_start, test_end,
+                 learn_rate=lambda x: 1.0 / (x + 1), C=1.0):
         self.sentences = vpe.AllSentences()
         self.annotations = vpe.Annotations()
         self.file_names = vpe.Files()
@@ -77,9 +79,12 @@ class AntecedentClassifier:
         self.diffs = []
         self.train_results, self.val_results, self.test_results = [], [], []
 
-    def initialize(self, pos_tests, seed=1917, W=None, test=0, test_specific=(None,None), save=False, load=False, update=False, verbose=False):
+    def initialize(self, pos_tests, seed=1917, W=None, test=0, test_specific=(None, None), save=False, load=False,
+                   update=False, verbose=False):
         if not load:
             self.import_data()
+            self.save_imported_data()
+            print 'SAVED IMPORTED DATA'
             self.generate_possible_ants(pos_tests, test=test)
             self.debug_ant_selection()
             self.build_feature_vectors()
@@ -95,6 +100,7 @@ class AntecedentClassifier:
 
         if update:
             # self.generate_possible_ants(pos_tests, test=test, strong=False)
+            self.generate_possible_ants(pos_tests, test=test, strong=True)
             # self.generate_possible_ants2()
             self.debug_ant_selection()
             self.debug_ant_selection(check_list=self.val_triggers)
@@ -114,12 +120,12 @@ class AntecedentClassifier:
         sentnum_modifier = -1
         dnum = 0
         for d in dirs:
-            subdir = d+self.file_names.SLASH_CHAR
+            subdir = d + self.file_names.SLASH_CHAR
             if subdir.startswith('.'): continue
 
             if (self.start_train <= dnum <= self.end_train) or \
-               (self.start_test <= dnum <= self.end_test) or \
-               (self.start_val <= dnum <= self.end_val):
+                    (self.start_test <= dnum <= self.end_test) or \
+                    (self.start_val <= dnum <= self.end_val):
 
                 section_annotation = vpe.AnnotationSection(subdir, self.file_names.VPE_ANNOTATIONS)
 
@@ -130,7 +136,7 @@ class AntecedentClassifier:
                     if not test or (test and f in test):
                         # Here we are now getting the non-MRG POS file that we had neglected to get before.
                         try:
-                            mrg_matrix = vpe.XMLMatrix(f+'.mrg.xml', self.file_names.XML_MRG+subdir, get_deps=True)
+                            mrg_matrix = vpe.XMLMatrix(f + '.mrg.xml', self.file_names.XML_MRG + subdir, get_deps=True)
                         except IOError:
                             continue
                             # mrg_matrix = vpe.XMLMatrix(f+'.pos.xml', self.file_names.XML_POS, pos_file=True)
@@ -142,15 +148,18 @@ class AntecedentClassifier:
                         # self.triggers.add_auxs(mrg_matrix.get_gs_auxiliaries(file_annotations, sentnum_modifier))
                         try:
                             if self.start_train <= dnum <= self.end_train:
-                                self.train_ants += mrg_matrix.get_gs_antecedents(file_annotations, section_triggers, sentnum_modifier)
+                                self.train_ants += mrg_matrix.get_gs_antecedents(file_annotations, section_triggers,
+                                                                                 sentnum_modifier)
                                 self.train_triggers += section_triggers
 
                             if self.start_val <= dnum <= self.end_val:
-                                self.val_ants += mrg_matrix.get_gs_antecedents(file_annotations, section_triggers, sentnum_modifier)
+                                self.val_ants += mrg_matrix.get_gs_antecedents(file_annotations, section_triggers,
+                                                                               sentnum_modifier)
                                 self.val_triggers += section_triggers
 
                             if self.start_test <= dnum <= self.end_test:
-                                self.test_ants += mrg_matrix.get_gs_antecedents(file_annotations, section_triggers, sentnum_modifier)
+                                self.test_ants += mrg_matrix.get_gs_antecedents(file_annotations, section_triggers,
+                                                                                sentnum_modifier)
                                 self.test_triggers += section_triggers
 
                         except AssertionError:
@@ -160,25 +169,27 @@ class AntecedentClassifier:
                         self.annotations.add_section(section_annotation)
                         self.sentences.add_mrg(mrg_matrix)
 
-                        sentnum_modifier = len(self.sentences)-1
+                        sentnum_modifier = len(self.sentences) - 1
             dnum += 1
 
         for trig in self.train_triggers + self.val_triggers + self.test_triggers:
             sent = self.sentences[trig.sentnum].words
             try:
-                if sent[trig.wordnum+1] == 'so' or sent[trig.wordnum+1] == 'likewise':
+                if sent[trig.wordnum + 1] == 'so' or sent[trig.wordnum + 1] == 'likewise':
                     trig.type = 'so'
-                if (sent[trig.wordnum+1] == 'the' and sent[trig.wordnum+2] in ['same','opposite']):
+                if (sent[trig.wordnum + 1] == 'the' and sent[trig.wordnum + 2] in ['same', 'opposite']):
                     trig.type = 'so'
             except IndexError:
                 pass
 
-    def generate_possible_ants(self, pos_tests, test=0, delete_random=0.0, only_filter=False, strong=False):
+    def generate_possible_ants(self, pos_tests, test=0, delete_random=0.0, only_filter=False, strong=False,
+                               test_specific=(None, None)):
         """Generate all candidate antecedents."""
         if not only_filter:
             print 'Generating possible antecedents...'
-            bar = ProgBar(len(self.train_triggers)+len(self.val_triggers)+len(self.test_triggers))
-            if test: # ONLY FOR TESTING! THIS CHEATS!!
+            bar = ProgBar(len(self.train_triggers) + len(self.val_triggers) + len(self.test_triggers))
+
+            if test:  # ONLY FOR TESTING! THIS CHEATS!!
                 for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
                     trigger.possible_ants = []
                     self.sentences.set_possible_ants(trigger, pos_tests)
@@ -187,9 +198,11 @@ class AntecedentClassifier:
 
             # Fair.
             for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
-                trigger.possible_ants = []
-                self.sentences.set_possible_ants(trigger, pos_tests)
-                trigger.possible_ants = list(trigger.possible_ants)
+                if not (test_specific[0] and test_specific[1]) or (
+                        trigger.sentnum == test_specific[0] and trigger.wordnum == test_specific[1]):
+                    trigger.possible_ants = []
+                    self.sentences.set_possible_ants(trigger, pos_tests)
+                    trigger.possible_ants = list(trigger.possible_ants)
 
                 bar.update()
 
@@ -201,7 +214,7 @@ class AntecedentClassifier:
         for s in self.sentences:
             for p in s.pos:
                 all_pos.add(p)
-        all_pos_combos = set([(a,b) for a in all_pos for b in all_pos])
+        all_pos_combos = set([(a, b) for a in all_pos for b in all_pos])
 
         ant_start_pos_combo = set()
         ant_end_pos_combo = set()
@@ -211,8 +224,8 @@ class AntecedentClassifier:
             ant_start_pos.add(trig.gold_ant.sub_sentdict.pos[0])
             ant_end_pos.add(trig.gold_ant.sub_sentdict.pos[-1])
             if len(trig.gold_ant.sub_sentdict) > 1:
-                ant_start_pos_combo.add((trig.gold_ant.sub_sentdict.pos[0],trig.gold_ant.sub_sentdict.pos[1]))
-                ant_end_pos_combo.add((trig.gold_ant.sub_sentdict.pos[-1],trig.gold_ant.sub_sentdict.pos[-2]))
+                ant_start_pos_combo.add((trig.gold_ant.sub_sentdict.pos[0], trig.gold_ant.sub_sentdict.pos[1]))
+                ant_end_pos_combo.add((trig.gold_ant.sub_sentdict.pos[-1], trig.gold_ant.sub_sentdict.pos[-2]))
 
         filter_start_combo = all_pos_combos - ant_start_pos_combo
         filter_end_combo = all_pos_combos - ant_end_pos_combo
@@ -227,7 +240,7 @@ class AntecedentClassifier:
             deletes = []
             for ant in trigger.possible_ants:
                 size = len(all_ants)
-                all_ants.add((ant.sentnum,ant.start,ant.end))
+                all_ants.add((ant.sentnum, ant.start, ant.end))
 
                 if False:
                     pass
@@ -240,11 +253,13 @@ class AntecedentClassifier:
                     c += 1
                     deletes.append(ant)
 
-                elif strong and len(ant.sub_sentdict) > 1 and (ant.sub_sentdict.pos[0],ant.sub_sentdict.pos[1]) in filter_start_combo:
+                elif strong and len(ant.sub_sentdict) > 1 and (
+                ant.sub_sentdict.pos[0], ant.sub_sentdict.pos[1]) in filter_start_combo:
                     c += 1
                     deletes.append(ant)
-                
-                elif strong and len(ant.sub_sentdict) > 1 and (ant.sub_sentdict.pos[-1],ant.sub_sentdict.pos[-2]) in filter_end_combo:
+
+                elif strong and len(ant.sub_sentdict) > 1 and (
+                ant.sub_sentdict.pos[-1], ant.sub_sentdict.pos[-2]) in filter_end_combo:
                     c += 1
                     deletes.append(ant)
 
@@ -263,7 +278,7 @@ class AntecedentClassifier:
             for ant in deletes:
                 trigger.possible_ants.remove(ant)
 
-        print 'Deleted %d bad antecedents!'%c
+        print 'Deleted %d bad antecedents!' % c
 
     def generate_possible_ants2(self):
         tag_length_dict = {}
@@ -286,24 +301,26 @@ class AntecedentClassifier:
 
         return nlargest(k, trigger.possible_ants, key=vpe.Antecedent.get_score)
 
-    def build_feature_vectors(self, verbose=True, test_specific=(None,None)):
+    def build_feature_vectors(self, verbose=True, test_specific=(None, None)):
 
         word2vec_dict = truth.loadword2vecs()
-        all_pos_tags = truth.extract_data_from_file(truth.EACH_UNIQUE_POS_FILE) # We only want to import this file once.
+        all_pos_tags = truth.extract_data_from_file(
+            truth.EACH_UNIQUE_POS_FILE)  # We only want to import this file once.
 
         print 'Building feature vectors...'
 
         dep_names = ('prep','nsubj','dobj','nmod','adv','conj','vmod','amod','csubj')
         print len(dep_names),dep_names
 
-        bar = ProgBar(len(self.train_triggers)+len(self.val_triggers)+len(self.test_triggers))
+        bar = ProgBar(len(self.train_triggers) + len(self.val_triggers) + len(self.test_triggers))
         for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
-            if not (test_specific[0] and test_specific[1]) or (test_specific[0] == trigger.sentnum and test_specific[1] == trigger.wordnum):
+            if not (test_specific[0] and test_specific[1]) or (
+                    test_specific[0] == trigger.sentnum and test_specific[1] == trigger.wordnum):
                 alignment_matrix(self.sentences, trigger, word2vec_dict,
                                  dep_names=dep_names,
                                  pos_tags=all_pos_tags)
                 if trigger == self.train_triggers[0]:
-                    print 'Feature vector length: %d'%len(trigger.gold_ant.x)
+                    print 'Feature vector length: %d' % len(trigger.gold_ant.x)
                 bar.update()
 
         return
@@ -311,7 +328,7 @@ class AntecedentClassifier:
     def initialize_weights(self, initial=None, seed=1917):
         np.random.seed(seed)
         # self.W_old = np.ones(len(self.train_triggers[0].possible_ants[0].x))
-        if initial==None:
+        if initial == None:
             self.W_old = np.random.rand(len(self.train_triggers[0].possible_ants[0].x))
         else:
             self.W_old = initial
@@ -349,21 +366,21 @@ class AntecedentClassifier:
             missed += 1
 
             if verbose:
-                print '\nMISSED ANT FOR TRIGGER',trigger
-                print 'ANT: ',trigger.gold_ant.sub_sentdict.pos,trigger.gold_ant.sub_sentdict.words
+                print '\nMISSED ANT FOR TRIGGER', trigger
+                print 'ANT: ', trigger.gold_ant.sub_sentdict.pos, trigger.gold_ant.sub_sentdict.words
                 print self.sentences.get_sentence(trigger.sentnum)
                 print self.sentences.get_sentence_tree(trigger.sentnum)
             if write_to_file:
-                f.write('Trigger: %s\n'%trigger.__repr__())
-                f.write('Antecedent: %s\n'%trigger.gold_ant.__repr__())
-                f.write('Tree:\n%s'%self.sentences.get_sentence_tree(trigger.sentnum).__repr__())
+                f.write('Trigger: %s\n' % trigger.__repr__())
+                f.write('Antecedent: %s\n' % trigger.gold_ant.__repr__())
+                f.write('Tree:\n%s' % self.sentences.get_sentence_tree(trigger.sentnum).__repr__())
 
-        s = ['Total ants: %d'%sum(lengths),
-            '\nMissed this many gold possible ants: %d'%missed,
-             'That is %0.2f percent.'%(float(missed)/total),
-             'Got this many head matches as a percent of total: %0.2f'%(head_matches/float(len(check_list))),
-             'Average length of possible ants: %d'%np.mean(lengths),
-             'Min/Max lengths: %d, %d\n'%(min(lengths),max(lengths))]
+        s = ['Total ants: %d' % sum(lengths),
+             '\nMissed this many gold possible ants: %d' % missed,
+             'That is %0.2f percent.' % (float(missed) / total),
+             'Got this many head matches as a percent of total: %0.2f' % (head_matches / float(len(check_list))),
+             'Average length of possible ants: %d' % np.mean(lengths),
+             'Min/Max lengths: %d, %d\n' % (min(lengths), max(lengths))]
 
         for x in s:
             print x
@@ -371,12 +388,12 @@ class AntecedentClassifier:
 
         if write_to_file:
             for x in s:
-                f.write(x+'\n')
+                f.write(x + '\n')
             f.close()
 
     def normalize(self):
         print 'Normalizing the data...'
-        xtrain,xval,xtest = [],[],[]
+        xtrain, xval, xtest = [], [], []
 
         for trig in self.train_triggers:
             for ant in trig.possible_ants:
@@ -398,21 +415,21 @@ class AntecedentClassifier:
         xval = s.transform(xval)
         xtest = s.transform(xtest)
 
-        i=0
+        i = 0
         for trig in self.train_triggers:
             for ant in trig.possible_ants:
                 ant.x = xtrain[i]
                 i += 1
             trig.gold_ant.x = xtrain[i].flatten()
             i += 1
-        i=0
+        i = 0
         for trig in self.val_triggers:
             for ant in trig.possible_ants:
                 ant.x = xval[i]
                 i += 1
             trig.gold_ant.x = xval[i].flatten()
             i += 1
-        i=0
+        i = 0
         for trig in self.test_triggers:
             for ant in trig.possible_ants:
                 ant.x = xtest[i].flatten()
@@ -439,18 +456,18 @@ class AntecedentClassifier:
             if verbose and (not printed and len(X[key]) >= 79):
                 for ant in X[key]:
                     print ant
-                print "\nTotal ants for this key: %d"%len(X[key])
+                print "\nTotal ants for this key: %d" % len(X[key])
                 print key
                 printed = True
 
-        print 'TOTAL : %d, UNIQUE : %d'%(sum(length_list), len(X))
-        print 'Average number of ants corresponding to same vec: %0.2f, min= %d, max= %d'%(np.mean(length_list),
-                                                                                           min(length_list),
-                                                                                           max(length_list))
+        print 'TOTAL : %d, UNIQUE : %d' % (sum(length_list), len(X))
+        print 'Average number of ants corresponding to same vec: %0.2f, min= %d, max= %d' % (np.mean(length_list),
+                                                                                             min(length_list),
+                                                                                             max(length_list))
 
     def fit(self, epochs=5, verbose=True, k=5, features_to_analyze=5, c_schedule=1.0):
         # Here we are just adding the gold standard to the training set.
-        for trig in a.train_triggers:
+        for trig in self.train_triggers:
             has = False
             for ant in trig.possible_ants:
                 if ant == trig.gold_ant:
@@ -461,21 +478,21 @@ class AntecedentClassifier:
 
         best_score = 0.0
         best_weights = []
-
         i=0
         for n in range(epochs):
             for trigger in shuffle(self.train_triggers):
                 bestk = self.bestk_ants(trigger, self.W_old, k=k)
 
                 self.W_old = mira.update_weights(self.W_old, bestk, trigger.gold_ant, self.loss_function, C=self.C)
-                self.W_avg = ((1.0-self.learn_rate(i)) * self.W_avg) + (self.learn_rate(i) * self.W_old) # Running average.
+                self.W_avg = ((1.0 - self.learn_rate(i)) * self.W_avg) + (
+                self.learn_rate(i) * self.W_old)  # Running average.
                 self.analyze(self.W_avg, features_to_analyze)
-                i+=1
+                i += 1
 
-            # if n % self.SCHEDULE_FREQUENCY == 0:
-            #     self.C /= c_schedule
+                # if n % self.SCHEDULE_FREQUENCY == 0:
+                #     self.C /= c_schedule
 
-            # if verbose and n>0:
+                # if verbose and n>0:
                 train_preds = self.predict(self.train_triggers)
                 val_preds = self.predict(self.val_triggers)
                 test_preds = self.predict(self.test_triggers)
@@ -484,21 +501,25 @@ class AntecedentClassifier:
                 self.val_err.append(self.accuracy(val_preds))
                 self.test_err.append(self.accuracy(test_preds))
 
+                self.train_results = list(self.train_results)
+                self.val_results = list(self.val_results)
+                self.test_results = list(self.test_results)
+
                 self.train_results.append(self.criteria_based_results(train_preds))
                 self.val_results.append(self.criteria_based_results(val_preds))
                 self.test_results.append(self.criteria_based_results(test_preds))
 
-                self.diffs.append(np.mean((self.W_avg-self.W_old)**2))
+                self.diffs.append(np.mean((self.W_avg - self.W_old) ** 2))
 
-                print '\nEpoch %d Train/val/test error: %0.2f, %0.2f, %0.2f'\
-                      %(n, self.train_err[-1], self.val_err[-1], self.test_err[-1])
+                print '\nEpoch %d Train/val/test error: %0.2f, %0.2f, %0.2f' \
+                      % (n, self.train_err[-1], self.val_err[-1], self.test_err[-1])
 
-                print '\tTrain/val/test ExacM: %0.2f, %0.2f, %0.2f'\
-                      %(self.train_results[-1][0], self.val_results[-1][0], self.test_results[-1][0])
-                print '\tTrain/val/test HeadM: %0.2f, %0.2f, %0.2f'\
-                      %(self.train_results[-1][1], self.val_results[-1][1], self.test_results[-1][1])
-                print '\tTrain/val/test HeadO: %0.2f, %0.2f, %0.2f'\
-                      %(self.train_results[-1][2], self.val_results[-1][2], self.test_results[-1][2])
+                print '\tTrain/val/test ExacM: %0.2f, %0.2f, %0.2f' \
+                      % (self.train_results[-1][0], self.val_results[-1][0], self.test_results[-1][0])
+                print '\tTrain/val/test HeadM: %0.2f, %0.2f, %0.2f' \
+                      % (self.train_results[-1][1], self.val_results[-1][1], self.test_results[-1][1])
+                print '\tTrain/val/test HeadO: %0.2f, %0.2f, %0.2f' \
+                      % (self.train_results[-1][2], self.val_results[-1][2], self.test_results[-1][2])
 
                 if self.val_results[-1][1] > best_score:
                     best_score = self.val_results[-1][1]
@@ -516,7 +537,6 @@ class AntecedentClassifier:
                 # print best_ant
                 # print 'Difference btwen avg vector w_old: %0.6f'%(self.diffs[-1])
 
-
         self.train_results = np.array(self.train_results)
         self.val_results = np.array(self.val_results)
         self.test_results = np.array(self.test_results)
@@ -529,10 +549,8 @@ class AntecedentClassifier:
 
         print 'Validation score using best weight vector: %0.3f'%self.criteria_based_results(val_preds)[1]
         print 'Test score using best validation weight vector: %0.3f'%self.criteria_based_results(test_preds)[1]
-
-        # best_idx = self.val_results[:,1].argmax()
-        # print 'Best validation head match - %0.3f'%self.val_results[:,1][best_idx]
-        # print 'This gives us the following test head match - %0.3f'%self.test_results[:,1][best_idx]
+        
+        return self.criteria_based_results(val_preds)[1], self.criteria_based_results(test_preds)[1]
 
     def predict(self, trigger_list):
         predictions = []
@@ -559,19 +577,19 @@ class AntecedentClassifier:
         fp = float(len([val for val in proposed_vals if not val in gold_vals]))
         fn = float(len([val for val in gold_vals if not val in proposed_vals]))
 
-        precision = tp/(tp+fp)
-        recall = tp/(tp+fn)
-    
+        precision = tp / (tp + fp)
+        recall = tp / (tp + fn)
+
         if precision == 0.0 or recall == 0.0:
             return 1.0
 
-        f1 = (2.0*precision*recall)/(precision+recall)
+        f1 = (2.0 * precision * recall) / (precision + recall)
 
-        #dotprod = proposed_ant.score
-        #return 0.0 if dotprod >= 0.5 else 0.5-dotprod   
-        #norm_diff = np.linalg.norm(proposed_ant.x - gold_ant.x)
-        #return 0.0 if norm_diff <= 0.25 else norm_diff-0.25
-    
+        # dotprod = proposed_ant.score
+        # return 0.0 if dotprod >= 0.5 else 0.5-dotprod
+        # norm_diff = np.linalg.norm(proposed_ant.x - gold_ant.x)
+        # return 0.0 if norm_diff <= 0.25 else norm_diff-0.25
+
         return 1.0 - f1
 
     def accuracy(self, predictions):
@@ -622,36 +640,37 @@ class AntecedentClassifier:
         if not self.feature_vals:
             self.feature_vals = [[] for _ in range(num_features)]
             self.feature_names = ['Bias weight']
-            for i in range(num_features-2):
-                self.random_features.append(randrange(1,len(w)))
-                self.feature_names.append('Rand_feature %d'%self.random_features[i])
+            for i in range(num_features - 2):
+                self.random_features.append(randrange(1, len(w)))
+                self.feature_names.append('Rand_feature %d' % self.random_features[i])
             self.feature_names.append('NP dot product/norm')
 
         self.feature_vals[0].append(w[0])
-        for i in range(num_features-2):
-            self.feature_vals[i+1].append(w[self.random_features[i]])
+        for i in range(num_features - 2):
+            self.feature_vals[i + 1].append(w[self.random_features[i]])
         self.feature_vals[-1].append(w[-1])
 
     def make_graphs(self, name):
         # params = 'tests/post_changes/%s'%name
-        params = 'best_results_analysis/%s'%name
+        params = 'best_results_analysis/%s' % name
 
         plt.figure(1)
         plt.title('Running Average Weight Vector 2-Norm over time')
         plt.plot(range(len(self.norms)), self.norms, 'b-')
-        plt.savefig(params+'norm_change1.png', bbox_inches='tight')
+        plt.savefig(params + 'norm_change1.png', bbox_inches='tight')
         plt.clf()
 
-        colors = ['b','y','m','r','g']
+        colors = ['b', 'y', 'm', 'r', 'g']
         plt.figure(2)
         ax = plt.subplot(111)
         plt.title('Exact Feature Values over time')
         for i in range(len(self.feature_vals)):
-            ax.plot(range(len(self.feature_vals[i])), self.feature_vals[i], colors[i%len(colors)]+'-', label=self.feature_names[i])
+            ax.plot(range(len(self.feature_vals[i])), self.feature_vals[i], colors[i % len(colors)] + '-',
+                    label=self.feature_names[i])
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
         ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        plt.savefig(params+'feature_value_change1.png', bbox_inches='tight')
+        plt.savefig(params + 'feature_value_change1.png', bbox_inches='tight')
         plt.clf()
 
         plt.figure(3)
@@ -663,13 +682,13 @@ class AntecedentClassifier:
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
         ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        plt.savefig(params+'errors.png', bbox_inches='tight')
+        plt.savefig(params + 'errors.png', bbox_inches='tight')
         plt.clf()
 
         plt.figure(4)
         plt.title('Squared Difference between average and MIRA weight vector')
         plt.plot(range(len(self.diffs)), self.diffs, 'bo')
-        plt.savefig(params+'weight_vector_change1.png', bbox_inches='tight')
+        plt.savefig(params + 'weight_vector_change1.png', bbox_inches='tight')
         plt.clf()
 
         plt.figure(5)
@@ -685,7 +704,7 @@ class AntecedentClassifier:
         plt.clf()
 
     def log_results(self, name):
-        destination = 'ant_results/'+name
+        destination = 'ant_results/' + name
 
         errors = []
         for lst in self.train_err, self.val_err, self.test_err:
@@ -695,12 +714,12 @@ class AntecedentClassifier:
                 if lst[i] < lowest_error:
                     lowest_error = lst[i]
                     epoch = i
-            errors.append((lowest_error,epoch))
+            errors.append((lowest_error, epoch))
 
         results = []
         for lst in self.train_results, self.val_results, self.test_results:
-            best_em, best_hm, best_ho = 0,0,0
-            em_epoch, hm_epoch, ho_epoch = 0,0,0
+            best_em, best_hm, best_ho = 0, 0, 0
+            em_epoch, hm_epoch, ho_epoch = 0, 0, 0
             for i in range(len(lst)):
                 if lst[i][0] > best_em:
                     best_em = lst[i][0]
@@ -714,25 +733,28 @@ class AntecedentClassifier:
                     best_ho = lst[i][2]
                     ho_epoch = i
 
-            results.append((best_em,em_epoch, best_hm,hm_epoch, best_ho,ho_epoch))
+            results.append((best_em, em_epoch, best_hm, hm_epoch, best_ho, ho_epoch))
 
         write_string = ''
-        names = ['Train','Validation','Test']
-        res_names = ['exact match','head match','head overlap']
+        names = ['Train', 'Validation', 'Test']
+        res_names = ['exact match', 'head match', 'head overlap']
         for i in range(len(names)):
-            write_string += '%s results: lowest error = %0.2f at epoch %d\n'%(names[i],errors[i][0],errors[i][1])
+            write_string += '%s results: lowest error = %0.2f at epoch %d\n' % (names[i], errors[i][0], errors[i][1])
             for j in range(len(res_names)):
-                write_string += '\tBest %s = %0.2f at epoch %d\n'%(res_names[j],results[i][j*2],results[i][(j*2)+1])
+                write_string += '\tBest %s = %0.2f at epoch %d\n' % (
+                res_names[j], results[i][j * 2], results[i][(j * 2) + 1])
 
-        with open(destination+'.txt','w') as f:
+        with open(destination + '.txt', 'w') as f:
             f.write(write_string)
 
         np.save(destination,
-                np.array([self.train_err,self.val_err,self.test_err,[self.train_results,self.val_results,self.test_results]]))
+                np.array([self.train_err, self.val_err, self.test_err,
+                          [self.train_results, self.val_results, self.test_results]]))
 
     def save_imported_data(self, name=''):
         print 'Saving the data...'
-        np.save(self.file_names.IMPORTED_DATA+name, np.array([self.sentences, self.train_triggers, self.val_triggers, self.test_triggers]))
+        np.save(self.file_names.IMPORTED_DATA + name,
+                np.array([self.sentences, self.train_triggers, self.val_triggers, self.test_triggers]))
 
     def load_imported_data(self, name=''):
         print 'Loading the data...'
@@ -748,9 +770,9 @@ class AntecedentClassifier:
         for trig in self.train_triggers + self.val_triggers + self.test_triggers:
             sent = self.sentences[trig.sentnum].words
             try:
-                if sent[trig.wordnum+1] == 'so' or sent[trig.wordnum+1] == 'likewise':
+                if sent[trig.wordnum + 1] == 'so' or sent[trig.wordnum + 1] == 'likewise':
                     trig.type = 'so'
-                if (sent[trig.wordnum+1] == 'the' and sent[trig.wordnum+2] in ['same','opposite']):
+                if sent[trig.wordnum + 1] == 'the' and sent[trig.wordnum + 2] in ['same', 'opposite']:
                     trig.type = 'so'
             except IndexError:
                 pass
@@ -763,7 +785,6 @@ class AntecedentClassifier:
         assert type_ in ['modal', 'be', 'have', 'do', 'to', 'so']
         if alter_train:
             self.train_triggers = [trig for trig in self.train_triggers if trig.type == type_]
-        
         if alter_test:
             old_len = len(self.val_triggers)
             self.val_triggers = [trig for trig in self.val_triggers if trig.type == type_]
@@ -790,9 +811,12 @@ class AntecedentClassifier:
                 print trig.gold_ant
 
         print 'Baseline results:'
-        print '\tTrain: ',self.criteria_based_results(train_ant_pred)
-        print '\tVal: ',self.criteria_based_results(val_ant_pred)
-        print '\tTest: ',self.criteria_based_results(test_ant_pred)
+        print '\tTrain: ', self.criteria_based_results(train_ant_pred)
+        print '\tVal: ', self.criteria_based_results(val_ant_pred)
+        print '\tTest: ', self.criteria_based_results(test_ant_pred)
+
+        # return head match % for validation and test results
+        return self.criteria_based_results(val_ant_pred)[1], self.criteria_based_results(test_ant_pred)[2]
 
     def gold_analysis(self):
         print 'Triggers:',
@@ -803,10 +827,9 @@ class AntecedentClassifier:
             else:
                 freq[trig.type] += 1
         print freq
-        print 'Total:',sum(freq.values())
+        print 'Total:', sum(freq.values())
 
-
-        d = {'starts_with_aux':[], 'ends_with_aux':[]}
+        d = {'starts_with_aux': [], 'ends_with_aux': []}
         all_pos = set()
         for s in self.sentences:
             for p in s.pos:
@@ -825,10 +848,10 @@ class AntecedentClassifier:
             ant_start_pos.add(trig.gold_ant.sub_sentdict.pos[-1])
 
         print 'Ants never start with these tags: ', all_pos - ant_start_pos
-        print 'Percent of ants that start with auxs: ',len(d['starts_with_aux']) / float(len(self.train_triggers))
+        print 'Percent of ants that start with auxs: ', len(d['starts_with_aux']) / float(len(self.train_triggers))
 
         print 'Ants never END with these tags: ', all_pos - ant_end_pos
-        print 'Percent of ants that END with auxs: ',len(d['ends_with_aux']) / float(len(self.train_triggers))
+        print 'Percent of ants that END with auxs: ', len(d['ends_with_aux']) / float(len(self.train_triggers))
 
 if __name__ == '__main__':
     pos_tests = ['VP', wc.is_adjective, wc.is_verb]
@@ -862,7 +885,7 @@ if __name__ == '__main__':
         if 'align' in sys.argv:
             a.initialize(pos_tests, seed=123, save=True, load=True, update=True, test_specific=(14036,14))
         else:
-            a.initialize(pos_tests, seed=123, save=True, load=True, update=True)           
+            a.initialize(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb], seed=123, save=True, load=False, update=False)
         # a.initialize(pos_tests, save=True, load=True, update=False, seed=2334)
         # a.debug_ant_selection(verbose=False)
         # for trig in a.train_triggers:

@@ -148,32 +148,21 @@ class AllSentences:
             # tree_pos = nt.getsmallestsubtrees(tree)
             # tree_words = tree.leaves()
             # leaves_dict = { (tree_pos[i].label(), tree_words[i]) : i+1 for i in range(len(tree_words))}
-
-            # new_ants = []
-            # for pos in phrases:
-            #     for position in nt.phrase_positions_in_tree(tree, pos):
-            #         start = None
-            #         for w in nt.getsmallestsubtrees(tree[position]):
-            #             # print w.label(), w[0]
-            #             end = (w.label(), w[0])
-
-            #             if not start:
             #                 start = end
-
+            #
             #             if sentnum == trigger.sentnum and leaves_dict[end] == trigger.wordnum or wc.is_punctuation(end[0]):
             #                 break
-
+            #
             #             ant = self.idxs_to_ant(sentnum, leaves_dict[start], leaves_dict[end]+1, trigger)
-
+            #
             #             i,j = leaves_dict[start],leaves_dict[end]
             #             if len(ant.sub_sentdict) > 0 and not ant_after_trigger(sentnum, start, end, trigger)\
             #                 and not ((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger) in new_ants):
-
+            #
             #                 bad = False
             #                 for pos_check in [wc.is_preposition, wc.is_punctuation]:
             #                     if pos_check(self.sentences[sentnum].pos[j-1]):
             #                         bad = True
-
             #                 if not bad:
             #                     ant = self.idxs_to_ant(sentnum, i, j, trigger)
             #                     if len(ant.sub_sentdict) > 0:
@@ -234,6 +223,9 @@ class XMLMatrix:
         for sentdict in self.matrix:
             yield sentdict
 
+    def get_sentences(self):
+        return [sentdict for sentdict in self.matrix]
+
     def find_word_sequence(self, words, minimum_match=None):
         """
             Returns the (i,j) start and (i,k) end indexes for the mrgmatrix from which the 'words' sequence starts and then ends.
@@ -264,6 +256,12 @@ class XMLMatrix:
     def get_subdir(self):
         return self.file_name[4:6]
 
+    def get_all_auxiliaries(self, sentnum_modifier=0):
+        auxs = Auxiliaries()
+        for sentdict in self:
+            auxs.add_auxs(sentdict.get_auxiliaries(), sentnum_modifier=sentnum_modifier)
+        return auxs
+
     def get_gs_auxiliaries(self, annotations, sentnum_modifier):
         parser = ET.XMLParser()
         tree = ET.parse(Files.XML_RAW_TOKENIZED+self.get_subdir()+Files.SLASH_CHAR+self.file_name[0:8]+'.xml', parser=parser)
@@ -281,7 +279,6 @@ class XMLMatrix:
                 s = SentDict(sentence, raw=True)
                 for i in range(0,len(s)):
                     if s.offset_starts[i] == crt_annotation.vpe_offset_start:
-                            #in range(crt_annotation.vpe_offset_start-1, crt_annotation.vpe_offset_start+2): #TODO: I MADE THIS LESS STRICT
                         raw_gold_indexes.append(len(raw_all_auxiliaries.auxs))
                         raw_gold_auxiliaries.append(RawAuxiliary(s.words[i], i, s.sentnum))
                         ann_num += 1
@@ -620,11 +617,7 @@ class AnnotationSection:
 
     def get_anns_for_file(self, f):
         """ Sometimes there are multiple instances of VPE in a file. """
-        ret = []
-        for annotation in self:
-            if annotation.file == f:
-                ret.append(annotation)
-
+        ret = [ann for ann in self if ann.file == f]
         return sorted(ret, key=lambda x: x.vpe_offset_start)
 
 class Annotation:

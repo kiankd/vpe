@@ -139,6 +139,9 @@ class VPEDetectionClassifier:
         """
         for i,aux in enumerate(self.all_auxiliaries.auxs):
             if (aux.sentnum,aux.wordnum) in [(12072,39),(10989,30),(11804,12),(11499,11)]:
+                print self.sentences.get_sentence(aux.sentnum)
+                print aux
+                print
                 aux.is_trigger = True
                 self.test_classes[i-self.pre_oversample_length] = 1
 
@@ -422,7 +425,6 @@ class VPEDetectionClassifier:
             self.oversample(multiplier=oversample)
 
 
-
 if __name__ == '__main__':
     start_time = time.clock()
 
@@ -454,9 +456,12 @@ if __name__ == '__main__':
     load = True
     load_classifier = True
     if not load:
-        for t1,t2 in [(15,19),(20,24)]:
+        for t1,t2 in [(20,24)]:
             classifier = VPEDetectionClassifier(0,14,t1,t2)
             classifier.load_data_npy(val=(classifier.start_test==15 and classifier.end_test==19), all_data=False) # We only use MRG files.
+            classifier.fix_test_set_triggers()
+            exit(0)
+
             classifier.set_features(features)
             classifier.make_so()
             classifier.make_feature_vectors(make_train_vectors=True, make_test_vectors=True, use_old_vectors=False)
