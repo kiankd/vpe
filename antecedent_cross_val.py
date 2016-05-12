@@ -61,7 +61,8 @@ def cross_validate(k_fold=5, type_=None):
         s += 'Average val accuracy: ' + str(np.mean([t[0] for t in lst])) + end
         s += 'Average test accuracy: ' + str(np.mean([t[1] for t in lst])) + end
         for tup in lst:
-            s += '\t' + str(tup) + end + end + end
+            s += '\t' + str(tup) + end
+        s += end
         results.append(s)
         print s
     results.append('------------------------------------------------')
@@ -74,4 +75,5 @@ def log_results(results_lst):
 
 if __name__ == '__main__':
     for type_ in ['do','be','to','modal','have','so']:
-        cross_validate(type_=type_)
+        results_lst = cross_validate(type_=type_)
+        log_results(results_lst)
