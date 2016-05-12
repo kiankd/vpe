@@ -39,6 +39,10 @@ def alignment_matrix(sentences, trigger, word2vec_dict, dep_names=('prep','adv',
         ant_sentdict = sentences.get_sentence(ant.sentnum)
 
         k,l = nearest_clause(ant_sentdict, ant.start-1, end=ant.end-1)
+
+        # if ant.sentnum == trigger.sentnum and k < l:
+        #     l = min(l, i) # we don't want the nearest clause to include the trigger's clause.
+
         ant_chunks = ant_sentdict.chunked_dependencies(k, l, dep_names=dep_names)
 
         ANT_CHUNK_LENGTHS.append(len(ant_chunks))
@@ -46,11 +50,11 @@ def alignment_matrix(sentences, trigger, word2vec_dict, dep_names=('prep','adv',
         remove_idxs(ant_chunks, ant.start, ant.end)
         remove_idxs(ant_chunks, trigger.wordnum, trigger.wordnum)
 
-        mapping, untrigs, unants = align(trig_chunks, ant_chunks, dep_names, word2vec_dict)
+        mapping, untrigs, unants = align(trig_chunks, ant_chunks, dep_names, word2vec_dict, threshold=0.15)
 
         ant.x = np.array([1] + alignment_vector(mapping, untrigs, unants, dep_names, word2vec_dict, verbose=False)
                              + relational_vector(trigger, ant)
-                             + avc.ant_trigger_relationship(ant, trigger, sentences, pos_tags)
+                             + avc.ant_trigger_relationship(ant, trigger, sentences, pos_tags, word2vec_dict)
                              + hardt_features(ant, trigger, sentences, pos_tags))
 
     # print 'Avg mapping, trig_chunks, ant_chunks lengths: %0.2f, %d, %0.2f'\
@@ -249,7 +253,7 @@ def align(t_chunks, a_chunks, dep_names, word2vec_dict, threshold=0.15, verbose=
 
         for j in range(len(a_chunks)):
             achunk = a_chunks[j]
-            s = similarity_score(tchunk, achunk, word2vec_dict)
+            s = similarity_score(tchunk, achunk, word2vec_dict)#, words_weight=0.0, lemma_weight=1.0, pos_weight=0.0)
 
             if s > threshold:
                 if tchunk in un_mapped_trigs:

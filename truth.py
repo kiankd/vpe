@@ -69,7 +69,11 @@ def untruth(i):
 
 def extract_data_from_file(file_name):
     ret = []
-    f = open(SVM_FILE_LOCATIONS+file_name, 'r')
+    try:
+        f = open(SVM_FILE_LOCATIONS+file_name, 'r')
+    except IOError:
+        f = open('../helper_files/'+file_name, 'r')
+
     for line in f:
         l = line[0:-1] # Don't include \n
         if '\r' in l:
@@ -87,8 +91,11 @@ def makefile(new_file_name, data):
     f.close()
 
 def loadword2vecs():
-    print 'Loading word2vec dictionary...'
-    f = open(SVM_FILE_LOCATIONS+WORD2VEC_FILE, 'r')
+    try:
+        print 'Loading word2vec dictionary...'
+        f = open(SVM_FILE_LOCATIONS+WORD2VEC_FILE, 'r')
+    except IOError:
+        f = open('../helper_files/'+WORD2VEC_FILE)
     dic = {}
     for line in f:
         str_vec = line.split(',')

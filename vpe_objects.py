@@ -6,6 +6,7 @@ from file_names import Files
 from os import listdir
 from truth import SENTENCE_SEARCH_DISTANCE
 from numpy import dot
+from copy import copy,deepcopy
 
 MODALS = ['can','could','may','must','might','will','would','shall','should']
 BE     = ['be']
@@ -141,46 +142,54 @@ class AllSentences:
 
             #Lets use the tree to decrease the number of dumb candidates.
 
-            phrases = [p for p in pos_tests if type(p)==str]
-            tree = nt.maketree(self.get_sentence(sentnum)['tree'][0])
-            tree_pos = nt.getsmallestsubtrees(tree)
-            tree_words = tree.leaves()
-            leaves_dict = { (tree_pos[i].label(), tree_words[i]) : i+1 for i in range(len(tree_words))}
-
-            new_ants = []
-            for pos in phrases:
-                for position in nt.phrase_positions_in_tree(tree, pos):
-                    start = None
-                    for w in nt.getsmallestsubtrees(tree[position]):
-                        # print w.label(), w[0]
-                        end = (w.label(), w[0])
-
-                        if not start:
-                            start = end
-
-                        if sentnum == trigger.sentnum and leaves_dict[end] == trigger.wordnum or wc.is_punctuation(end[0]):
-                            break
-
-                        ant = self.idxs_to_ant(sentnum, leaves_dict[start], leaves_dict[end]+1, trigger)
-
-                        i,j = leaves_dict[start],leaves_dict[end]
-                        if len(ant.sub_sentdict) > 0 and not ant_after_trigger(sentnum, start, end, trigger)\
-                            and not ((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger) in new_ants):
-
-                            bad = False
-                            for pos_check in [wc.is_preposition, wc.is_punctuation]:
-                                if pos_check(self.sentences[sentnum].pos[j-1]):
-                                    bad = True
-
-                            if not bad:
-                                ant = self.idxs_to_ant(sentnum, i, j, trigger)
-                                if len(ant.sub_sentdict) > 0:
-                                    trigger.add_possible_ant(ant)
-                                    new_ants.append((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger))
+            # phrases = [p for p in pos_tests if type(p)==str]
+            # tree = nt.maketree(self.get_sentence(sentnum)['tree'][0])
+            # tree_pos = nt.getsmallestsubtrees(tree)
+            # tree_words = tree.leaves()
+            # leaves_dict = { (tree_pos[i].label(), tree_words[i]) : i+1 for i in range(len(tree_words))}
+            #
+            # new_ants = []
+            # for pos in phrases:
+            #     for position in nt.phrase_positions_in_tree(tree, pos):
+            #         start = None
+            #         for w in nt.getsmallestsubtrees(tree[position]):
+            #             # print w.label(), w[0]
+            #             end = (w.label(), w[0])
+            #
+            #             if not start:
+            #                 start = end
+            #
+            #             if sentnum == trigger.sentnum and leaves_dict[end] == trigger.wordnum or wc.is_punctuation(end[0]):
+            #                 break
+            #
+            #             ant = self.idxs_to_ant(sentnum, leaves_dict[start], leaves_dict[end]+1, trigger)
+            #
+            #             i,j = leaves_dict[start],leaves_dict[end]
+            #             if len(ant.sub_sentdict) > 0 and not ant_after_trigger(sentnum, start, end, trigger)\
+            #                 and not ((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger) in new_ants):
+            #
+            #                 bad = False
+            #                 for pos_check in [wc.is_preposition, wc.is_punctuation]:
+            #                     if pos_check(self.sentences[sentnum].pos[j-1]):
+            #                         bad = True
+            #
+            #                 if not bad:
+            #                     ant = self.idxs_to_ant(sentnum, i, j, trigger)
+            #                     if len(ant.sub_sentdict) > 0:
+            #                         trigger.add_possible_ant(ant)
+            #                         new_ants.append((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger))
 
                             # print 'added poss_ant: %d to %d'%(leaves_dict[start], leaves_dict[end]+1),trigger.possible_ants[-1]
 
                     # raise Finished()
+
+    def set_possible_ants2(self, trigger, train_pos_starts_lengths):
+        for sentnum in range(max(0, trigger.sentnum - SENTENCE_SEARCH_DISTANCE), trigger.sentnum+1):
+            for i in range(len(self.sentences[sentnum])):
+                tag = self.sentences[sentnum].pos[i]
+                if tag in train_pos_starts_lengths:
+                    for j in range(i+1, min(len(self.sentences[sentnum]), 99 if sentnum!=trigger.sentnum else trigger.wordnum)):
+                        trigger.add_possible_ant(self.idxs_to_ant(sentnum, i, j, trigger))
 
     def idxs_to_ant(self, sentnum, start, end, trigger):
         sentdict = self.sentences[sentnum]
@@ -224,6 +233,9 @@ class XMLMatrix:
         for sentdict in self.matrix:
             yield sentdict
 
+    def get_sentences(self):
+        return [sentdict for sentdict in self.matrix]
+
     def find_word_sequence(self, words, minimum_match=None):
         """
             Returns the (i,j) start and (i,k) end indexes for the mrgmatrix from which the 'words' sequence starts and then ends.
@@ -254,6 +266,12 @@ class XMLMatrix:
     def get_subdir(self):
         return self.file_name[4:6]
 
+    def get_all_auxiliaries(self, sentnum_modifier=0):
+        auxs = Auxiliaries()
+        for sentdict in self:
+            auxs.add_auxs(sentdict.get_auxiliaries(), sentnum_modifier=sentnum_modifier)
+        return auxs
+
     def get_gs_auxiliaries(self, annotations, sentnum_modifier):
         parser = ET.XMLParser()
         tree = ET.parse(Files.XML_RAW_TOKENIZED+self.get_subdir()+Files.SLASH_CHAR+self.file_name[0:8]+'.xml', parser=parser)
@@ -271,7 +289,6 @@ class XMLMatrix:
                 s = SentDict(sentence, raw=True)
                 for i in range(0,len(s)):
                     if s.offset_starts[i] == crt_annotation.vpe_offset_start:
-                            #in range(crt_annotation.vpe_offset_start-1, crt_annotation.vpe_offset_start+2): #TODO: I MADE THIS LESS STRICT
                         raw_gold_indexes.append(len(raw_all_auxiliaries.auxs))
                         raw_gold_auxiliaries.append(RawAuxiliary(s.words[i], i, s.sentnum))
                         ann_num += 1
@@ -507,7 +524,7 @@ class SentDict:
 
     def chunked_dependencies(self, i, j, dep_names=None):
         """Here we will return a list of all relevant dependency clusters between word i and word j."""
-        deps = [dep for dep in self.dependencies if ((i <= dep.gov <= j) and (i <= dep.dependent <= j)
+        deps = [deepcopy(dep) for dep in self.dependencies if ((i <= dep.gov <= j) and (i <= dep.dependent <= j)
                                                                          and not dep_names or (dep_names and dep.name in dep_names))]
         # This makes it so that the gov is always the smaller one.
         for dep in deps:
@@ -597,11 +614,7 @@ class AnnotationSection:
 
     def get_anns_for_file(self, f):
         """ Sometimes there are multiple instances of VPE in a file. """
-        ret = []
-        for annotation in self:
-            if annotation.file == f:
-                ret.append(annotation)
-
+        ret = [ann for ann in self if ann.file == f]
         return sorted(ret, key=lambda x: x.vpe_offset_start)
 
 class Annotation:

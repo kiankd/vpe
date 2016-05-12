@@ -1,5 +1,6 @@
 import nltktree as nt
 import numpy
+import word2vec_functionality as w2v
 
 def build_feature_vector(ant, trigger, all_sentences, all_tags):
     """
@@ -29,8 +30,10 @@ def describe_trigger(trig, sentences, all_tags):
     v += nearest_trig_np(trig, sentences, all_tags)
     return v
 
-def ant_trigger_relationship(ant, trigger, sentences, all_tags):
+def ant_trigger_relationship(ant, trigger, sentences, all_tags, word2vec_dict):
     v = []
+
+    # pos tags
     ant_np = numpy.array(nearest_ant_np(ant, sentences, all_tags))
     trig_np = numpy.array(nearest_trig_np(trigger, sentences, all_tags))
 
@@ -42,6 +45,13 @@ def ant_trigger_relationship(ant, trigger, sentences, all_tags):
         val = numpy.dot(ant_np, trig_np) / (numpy.linalg.norm(ant_np) * numpy.linalg.norm(trig_np))
 
     v.append(val)
+
+    # word2vec words
+    ant_np_embedding = w2v.average_vec_for_list(nearest_ant_np(ant, sentences, all_tags, get_words=True), word2vec_dict)
+    trig_np_embedding = w2v.average_vec_for_list(nearest_trig_np(trigger, sentences, all_tags, get_words=True), word2vec_dict)
+
+    if ant_np_embedding and trig_np_embedding:
+        v.append(w2v.angle_btwn_vectors(ant_np_embedding, trig_np_embedding))
 
     # Comparing the word that comes before the antecedent to the trigger word.
     if ant.start != 0:
@@ -69,7 +79,7 @@ def ant_trigger_relationship(ant, trigger, sentences, all_tags):
 
     return v
 
-def nearest_trig_np(trig, sentences, all_tags):
+def nearest_trig_np(trig, sentences, all_tags, get_words=False):
     """
     @type trig: vpe_objects.Auxiliary
     @type sentences: vpe_objects.AllSentences
@@ -91,11 +101,14 @@ def nearest_trig_np(trig, sentences, all_tags):
     if closest_np == None:
         closest_np = t
 
+    if get_words:
+        return closest_np.leaves()
+
     np_pos = [subtree.label() for subtree in nt.getsmallestsubtrees(closest_np)]
 
     return encode_pos_tag_frequencies(np_pos, all_tags)
 
-def nearest_ant_np(ant, sentences, all_tags):
+def nearest_ant_np(ant, sentences, all_tags, get_words=False):
     """
     @type ant: vpe_objects.Antecedent
     @type sentences: vpe_objects.AllSentences
@@ -118,7 +131,8 @@ def nearest_ant_np(ant, sentences, all_tags):
             closest_np_value = ant_tup_idx - last_np_word_idx
             closest_np = NP
 
-    # print closest_np
+    if get_words:
+        return closest_np.leaves()
 
     try:
         np_pos = [subtree.label() for subtree in nt.getsmallestsubtrees(closest_np)]
