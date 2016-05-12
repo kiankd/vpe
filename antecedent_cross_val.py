@@ -11,13 +11,16 @@ C = 5.0
 LR = 0.01
 EPOCHS = 2
 
-def cross_validate(k_fold=5):
+def cross_validate(k_fold=5, type_=None):
     ac = AntecedentClassifier(0, 14, 15, 19, 20, 24)
     ac.load_imported_data()
     ac.initialize_weights()
 
     ac.C = C
     ac.learn_rate = lambda x: LR
+
+    if type_:
+        ac.set_trigger_type(type_, alter_train=True)
 
     all_trigs = np.array(ac.train_triggers + ac.val_triggers + ac.test_triggers)
 
@@ -47,13 +50,28 @@ def cross_validate(k_fold=5):
         ac.reset()
         ac.initialize_weights()
 
+    results = []
     for lst in (baseline_accs, accs):
-        print 'MIRA RESULTS' if lst == accs else 'BASLINE RESULTS'
-        print 'Average val accuracy: ',np.mean([t[0] for t in lst])
-        print 'Average test accuracy: ',np.mean([t[1] for t in lst])
+        end = '\n'
+        s = ''
+        if type_:
+            s+= 'TRIGGER TYPE: ' + type_ + end
+        s += 'MIRA RESULTS' if lst == accs else 'BASLINE RESULTS'
+        s += end
+        s += 'Average val accuracy: ' + str(np.mean([t[0] for t in lst])) + end
+        s += 'Average test accuracy: ' + str(np.mean([t[1] for t in lst])) + end
         for tup in lst:
-            print '\t',tup
-        print
+            s += '\t' + str(tup) + end + end + end
+        results.append(s)
+        print s
+    results.append('------------------------------------------------')
+    return results
+
+def log_results(results_lst):
+    with open('ANT_CROSS_VALIDATION_RESULTS.txt', 'a') as f:
+        for result_str in results_lst:
+            f.write(result_str)
 
 if __name__ == '__main__':
-    cross_validate()
+    for type_ in ['do','be','to','modal','have','so']:
+        cross_validate(type_=type_)
