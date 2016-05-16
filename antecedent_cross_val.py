@@ -2,8 +2,11 @@
 __author__ = 'kian'
 
 import numpy as np
+import word_characteristics as wc
 from detect_antecedents import AntecedentClassifier
 from sklearn.cross_validation import KFold
+
+AUTO_PARSE_NPY_DATA = 'antecedent_auto_parse_data.npy'
 
 # antecedent classifier hyper parameters
 K = 5
@@ -11,9 +14,14 @@ C = 5.0
 LR = 0.01
 EPOCHS = 2
 
-def cross_validate(k_fold=5, type_=None):
+def cross_validate(k_fold=5, type_=None, auto_parse=False):
     ac = AntecedentClassifier(0, 14, 15, 19, 20, 24)
-    ac.load_imported_data()
+
+    if auto_parse:
+        ac.load_imported_data(auto_parse_data=True)
+    else:
+        ac.load_imported_data()
+
     ac.initialize_weights()
 
     ac.C = C
@@ -73,7 +81,53 @@ def log_results(results_lst):
         for result_str in results_lst:
             f.write(result_str)
 
+def save_imported_data_for_antecedent(classifier):
+    """
+    @type classifier: AntecedentClassifier
+    """
+
+    # for some reason we need to do this for numpy to not get in infinite loop...
+    sent_words = []
+    for sent in classifier.sentences:
+        sent_words.append(sent.words)
+        sent.words = None
+
+    classifier.sentence_words = sent_words
+
+    data = [classifier.sentences, classifier.train_triggers,
+            classifier.val_triggers, classifier.test_triggers,
+            classifier.sentence_words]
+
+    np.save(AUTO_PARSE_NPY_DATA, np.array(data))
+
+def load_imported_data_for_antecedent():
+    ac = AntecedentClassifier(0, 14, 15, 19, 20, 24)
+
+    data = np.load(AUTO_PARSE_NPY_DATA)
+
+    ac.sentences = data[0]
+    ac.train_triggers = data[1]
+    ac.val_triggers = data[2]
+    ac.test_triggers = data[3]
+
+    for i,sentwords in enumerate(data[4]):
+        ac.sentences[i].words = sentwords
+
+    return ac
+
 if __name__ == '__main__':
-    for type_ in ['do','be','to','modal','have','so']:
-        results_lst = cross_validate(type_=type_)
+
+    # ac = AntecedentClassifier(0,14,15,19,20,24)
+    # ac.import_data(get_mrg=False)
+    # save_imported_data_for_antecedent(ac)
+    # ac = load_imported_data_for_antecedent()
+    # ac.generate_possible_ants(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb])
+    # ac.build_feature_vectors()
+    # ac.normalize()
+    # save_imported_data_for_antecedent(ac)
+    #
+    # exit(0)
+
+    for type_ in [None,'do','be','to','modal','have','so']:
+        results_lst = cross_validate(type_=type_, auto_parse=True)
         log_results(results_lst)

@@ -1,7 +1,9 @@
 import nltk
 import copy
-from word_characteristics import is_noun
 # This program is used to do everything I need to do with the nltk.
+
+def is_noun(tag):
+    return tag in ['NN','NNS','NNP','NNPS','WP','PRP','PRP$','DT'] or tag.startswith('NN')
 
 class NoVPException:
     def __init__(self): pass
@@ -254,7 +256,7 @@ def get_nearest_vp_exceptional(t, idx, trigger, sentnum):
     vps = []
     def find_vps_recursive(tree): # Need to save indexes of the VPs
         for child in tree:
-            if type(child) != str:
+            if type(child) != str and type(child) != unicode:
                 if child.label() == 'VP':
                     vps.append(child)
                 find_vps_recursive(child)

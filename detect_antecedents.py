@@ -20,6 +20,9 @@ from sklearn.preprocessing import StandardScaler
 from subprocess import call
 call('clear')
 
+AUTO_PARSE_XML_DIR = '/Users/kian/Documents/HONOR/xml_annotations/raw_auto_parse/'
+AUTO_PARSE_NPY_DATA = '../npy_data/antecedent_auto_parse_data.npy'
+
 def shuffle(list_):
     np.random.shuffle(list_)
     return list_
@@ -65,6 +68,8 @@ class AntecedentClassifier(object):
         self.test_err = []
         self.train_results, self.val_results, self.test_results = [], [], []
         self.diffs = []
+
+        self.sentence_words = []
 
     def reset(self):
         self.W_avg = None
@@ -112,7 +117,7 @@ class AntecedentClassifier(object):
 
         self.initialize_weights(initial=W, seed=seed)
 
-    def import_data(self, test=None):
+    def import_data(self, test=None, get_mrg=True):
         """Import data from our XML directory and find all of the antecedents. Takes a bit of time."""
         dirs = listdir(self.file_names.XML_MRG)
         dirs.sort()
@@ -122,6 +127,7 @@ class AntecedentClassifier(object):
         for d in dirs:
             subdir = d + self.file_names.SLASH_CHAR
             if subdir.startswith('.'): continue
+            file_list = listdir(self.file_names.XML_MRG + subdir)
 
             if (self.start_train <= dnum <= self.end_train) or \
                     (self.start_test <= dnum <= self.end_test) or \
@@ -136,7 +142,14 @@ class AntecedentClassifier(object):
                     if not test or (test and f in test):
                         # Here we are now getting the non-MRG POS file that we had neglected to get before.
                         try:
-                            mrg_matrix = vpe.XMLMatrix(f + '.mrg.xml', self.file_names.XML_MRG + subdir, get_deps=True)
+                            # This condition makes it so that we use the same files for auto-parse dataset results.
+                            if not f + '.mrg.xml' in file_list:
+                                raise IOError
+
+                            if get_mrg:
+                                mrg_matrix = vpe.XMLMatrix(f + '.mrg.xml', self.file_names.XML_MRG + subdir, get_deps=True)
+                            else:
+                                mrg_matrix = vpe.XMLMatrix(f + '.xml', AUTO_PARSE_XML_DIR, get_deps=True)
                         except IOError:
                             continue
                             # mrg_matrix = vpe.XMLMatrix(f+'.pos.xml', self.file_names.XML_POS, pos_file=True)
@@ -177,7 +190,7 @@ class AntecedentClassifier(object):
             try:
                 if sent[trig.wordnum + 1] == 'so' or sent[trig.wordnum + 1] == 'likewise':
                     trig.type = 'so'
-                if (sent[trig.wordnum + 1] == 'the' and sent[trig.wordnum + 2] in ['same', 'opposite']):
+                if sent[trig.wordnum + 1] == 'the' and sent[trig.wordnum + 2] in ['same', 'opposite']:
                     trig.type = 'so'
             except IndexError:
                 pass
@@ -314,11 +327,10 @@ class AntecedentClassifier(object):
 
         bar = ProgBar(len(self.train_triggers) + len(self.val_triggers) + len(self.test_triggers))
         for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
-            if not (test_specific[0] and test_specific[1]) or (
-                    test_specific[0] == trigger.sentnum and test_specific[1] == trigger.wordnum):
-                alignment_matrix(self.sentences, trigger, word2vec_dict,
-                                 dep_names=dep_names,
-                                 pos_tags=all_pos_tags)
+            if not (test_specific[0] and test_specific[1]) \
+                    or (test_specific[0] == trigger.sentnum and test_specific[1] == trigger.wordnum):
+
+                alignment_matrix(self.sentences, trigger, word2vec_dict, dep_names=dep_names, pos_tags=all_pos_tags)
                 if trigger == self.train_triggers[0]:
                     print 'Feature vector length: %d' % len(trigger.gold_ant.x)
                 bar.update()
@@ -328,7 +340,7 @@ class AntecedentClassifier(object):
     def initialize_weights(self, initial=None, seed=1917):
         np.random.seed(seed)
         # self.W_old = np.ones(len(self.train_triggers[0].possible_ants[0].x))
-        if initial == None:
+        if initial is None:
             self.W_old = np.random.rand(len(self.train_triggers[0].possible_ants[0].x))
         else:
             self.W_old = initial
@@ -751,15 +763,21 @@ class AntecedentClassifier(object):
                 np.array([self.train_err, self.val_err, self.test_err,
                           [self.train_results, self.val_results, self.test_results]]))
 
-    def save_imported_data(self, name=''):
+    def save_imported_data(self, name='', auto_parse_data=False):
         print 'Saving the data...'
-        np.save(self.file_names.IMPORTED_DATA + name,
-                np.array([self.sentences, self.train_triggers, self.val_triggers, self.test_triggers]))
+        if not auto_parse_data:
+            np.save(self.file_names.IMPORTED_DATA + name,
+                    np.array([self.sentences, self.train_triggers, self.val_triggers, self.test_triggers]))
+        else:
+            np.save(AUTO_PARSE_NPY_DATA,
+                    np.array([self.sentences, self.train_triggers, self.val_triggers, self.test_triggers]))
 
-    def load_imported_data(self, name=''):
+    def load_imported_data(self, auto_parse_data=False):
         print 'Loading the data...'
         if 'orig' in sys.argv:
             data = np.load('/home/2014/kkenyo1/vpe_project/npy_data/BEST_RESULTS_SO_FAR_imported_data.npy')
+        elif auto_parse_data:
+            data = np.load(AUTO_PARSE_NPY_DATA)
         else:
             data = np.load(self.file_names.IMPORTED_DATA)
         self.sentences = data[0]

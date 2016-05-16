@@ -4,9 +4,11 @@ import vpe_objects as vpe
 import vector_creation as vc
 import word_characteristics as wc
 import numpy as np
+import nltktree as nt
 import warnings
 from file_names import Files
 from os import listdir
+from sys import argv
 from sklearn.cross_validation import KFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import precision_score, recall_score, f1_score
@@ -16,6 +18,9 @@ from sklearn.ensemble import RandomForestClassifier
 from scipy.sparse import csr_matrix, vstack
 
 files = Files()
+MRG_DATA_FILE = 'dataset_with_features.npy'
+AUTO_PARSE_FILE = 'auto_parse_with_features.npy'
+AUTO_PARSE_XML_DIR = '/Users/kian/Documents/HONOR/xml_annotations/raw_auto_parse/'
 
 class Dataset(object):
     def __init__(self):
@@ -33,9 +38,13 @@ class Dataset(object):
     def total_length(self):
         return len(self.auxs)
 
-    def set_all_auxs(self):
+    def set_all_auxs(self, features=vc.get_all_features(), reset=False):
+        if reset:
+            self.X = []
+            self.Y = []
+
         if not self.X:
-            self.X += self.all_auxs_to_features(vc.get_all_features())
+            self.X += self.all_auxs_to_features(features)
             self.Y += self.get_aux_classifications()
 
     def get_auxs_by_type(self, type_):
@@ -49,15 +58,40 @@ class Dataset(object):
                 y.append(self.Y[i])
         return x,y
 
+    def get_aux_list_by_type(self, type_):
+        if type_ == 'all':
+            return self.auxs
+        return [aux for aux in self.auxs if aux.type==type_]
+
     def fix_auxs(self):
         for i,aux in enumerate(self.auxs):
             if (aux.wordnum, aux.sentnum) in [(30,14811),(11,15321),(12,15626),(39,15894)]:
                 aux.is_trigger = True
                 self.Y[i] = 1
 
-    def serialize(self):
+    def test_rules(self, train_auxs):
+        f = lambda x: 1 if x else 0
+
+        predictions = []
+        for i in range(len(train_auxs)):
+            aux = train_auxs[i]
+            sendict = self.sentences[aux.sentnum]
+            tree = sendict.get_nltk_tree()
+            word_subtree_positions = nt.get_smallest_subtree_positions(tree)
+
+            if aux.type == 'modal': predictions.append(f(wc.modal_rule(sendict, aux, tree, word_subtree_positions)))
+            elif aux.type == 'be': predictions.append(f(wc.be_rule(sendict, aux)))
+            elif aux.type == 'have': predictions.append(f(wc.have_rule(sendict, aux)))
+            elif aux.type == 'do': predictions.append(f(wc.do_rule(sendict, aux, tree, word_subtree_positions)))
+            elif aux.type == 'so': predictions.append(f(wc.so_rule(sendict, aux)))
+            elif aux.type == 'to': predictions.append(f(wc.to_rule(sendict, aux)))
+
+        return predictions
+
+    def serialize(self, mrg_data=True):
         print 'Serializing data...'
-        np.save('dataset_with_features.npy', np.array([self]))
+        fname = MRG_DATA_FILE if mrg_data else AUTO_PARSE_FILE
+        np.save(fname, np.array([self]))
 
     def all_auxs_to_features(self, features):
         x = []
@@ -75,12 +109,14 @@ class Dataset(object):
     def get_aux_classifications(self):
         return [1 if aux.is_trigger else 0 for aux in self.auxs]
 
-    def run_cross_validation(self, X, Y, model, k_fold=5, oversample=1, verbose=False, check_fp=False, rand=1917):
+    def run_cross_validation(self, X, Y, model, k_fold=5, oversample=1, verbose=False,
+                             check_fp=False, rand=1917, aux_type='all'):
         if verbose: print 'Performing cross-validation...'
         model_name = type(model).__name__
 
         train_results = []
         test_results = []
+        baseline_results = []
 
         kf = KFold(len(X), n_folds=k_fold, shuffle=True, random_state=rand)
 
@@ -101,6 +137,7 @@ class Dataset(object):
 
             X_train = vstack_csr_vecs(X_train)
             X_test = vstack_csr_vecs(X_test)
+            test_auxs = np.array(self.get_aux_list_by_type(aux_type))[test_idx]
 
             # Normalize data according to the standard deviation of the training set.
             with warnings.catch_warnings():
@@ -122,6 +159,7 @@ class Dataset(object):
             # Results.
             train_results.append(accuracy_results(Y_train, train_pred))
             test_results.append(accuracy_results(Y_test, test_pred))
+            baseline_results.append(accuracy_results(Y_test, self.test_rules(test_auxs)))
 
             if check_fp:
                 analyze_results(Y_test, test_pred, self.sentences, self.auxs)
@@ -131,11 +169,13 @@ class Dataset(object):
                 print 'Fold %d test  results: '%fold,test_results[-1]
             fold += 1
 
-        for lst in train_results,test_results:
+        for lst in train_results,test_results,baseline_results:
             if lst == train_results:
                 print '\nTraining set - average CV results for %s:'%model_name
-            else:
+            elif lst == test_results:
                 print '\nTesting sets - average CV results for %s:'%model_name
+            else:
+                print '\nTesting sets - BASELINE CV results for %s:'%model_name
 
             print 'Precision: %0.2f'%np.mean([t[0] for t in lst])
             print 'Recall: %0.2f'%np.mean([t[1] for t in lst])
@@ -160,9 +200,10 @@ class Dataset(object):
         return new_x, new_y
 
     @classmethod
-    def load_dataset(cls):
+    def load_dataset(cls, mrg_data=True):
         print 'Loading data...'
-        d = np.load('dataset_with_features.npy')[0]
+        fname = MRG_DATA_FILE if mrg_data else AUTO_PARSE_FILE
+        d = np.load(fname)[0]
         d.fix_auxs()
         return d
 
@@ -226,16 +267,25 @@ def load_data_into_sections(get_mrg=True):
         if d.startswith('.'):
             continue
 
+
         # Get all files we are concerned with. We don't load data from files with no instances of VPE.
         subdir = d + Files.SLASH_CHAR
         annotations = vpe.AnnotationSection(subdir, Files.VPE_ANNOTATIONS)
         vpe_files = sorted(set([annotation.file for annotation in annotations]))
 
+        file_list = listdir(Files.XML_MRG + subdir)
+
         sentences, auxs, gold_auxs = [], [], []
         for f in vpe_files:
             try:
                 extension = '.mrg.xml' if get_mrg else '.xml'
-                xml_data = vpe.XMLMatrix(f + extension, Files.XML_MRG + subdir)
+                path = Files.XML_MRG + subdir if get_mrg else AUTO_PARSE_XML_DIR
+
+                # This condition makes it so that we use the same files for auto-parse dataset results.
+                if not f + '.mrg.xml' in file_list:
+                    raise IOError
+
+                xml_data = vpe.XMLMatrix(f + extension, path)
             except IOError:  # The file doesn't exist.
                 continue
 
@@ -268,16 +318,34 @@ def analyze_results(y_true, y_pred, sentences, auxs):
             print aux
             print
 
-if __name__ == '__main__':
-    # data = load_data_into_sections()
-    # data.set_all_auxs()
-    # data.serialize()
-    data = Dataset.load_dataset()
+def run_feature_ablation(loaded_data):
+    # Features: ['words','pos','bigrams','my_features','old_rules','square_rules','combine_aux_type']
+    features = vc.get_all_features()
 
-    for type_ in ['do']:#,'do','to','modal','have','be']:
-        type_x, type_y = data.get_auxs_by_type(type_)
-        for model in [LogisticRegressionCV()]:#[LogisticRegression(), LogisticRegressionCV(), SVC(), LinearSVC()]:
-            for rand in range(0,100000,505):
-                print rand
-                data.run_cross_validation(type_x, type_y, model, oversample=5, check_fp=False, rand=rand)
+    for ablated in features:
+        print 'Feature not included: ',ablated
+        ablation_features = [f for f in features if f!=ablated]
+        loaded_data.set_all_auxs(ablation_features, reset=True)
+        loaded_data.run_cross_validation(loaded_data.X, loaded_data.Y, LogisticRegressionCV(),
+                                         oversample=5, check_fp=False, rand=1489987)
+        print '------------------------------------------'
+
+
+if __name__ == '__main__':
+    if 'save' in argv:
+        data = load_data_into_sections(get_mrg=False)
+        data.set_all_auxs()
+        data.serialize(mrg_data=False)
+
+    if 'load' in argv:
+        data = Dataset.load_dataset(mrg_data=False)
+        for type_ in ['all','do','to','modal','have','be']:
+            type_x, type_y = data.get_auxs_by_type(type_)
+            for model in [LogisticRegressionCV()]:#[LogisticRegression(), LogisticRegressionCV(), SVC(), LinearSVC()]:
+                print type_
+                data.run_cross_validation(type_x, type_y, model, oversample=5, check_fp=False, rand=1489987, aux_type=type_)
                 print '------------------------------------------'
+
+    if 'ablate' in argv:
+        data = load_data_into_sections(get_mrg=False) #MRG OR NO?
+        run_feature_ablation(data)
