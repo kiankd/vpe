@@ -24,7 +24,7 @@ def cross_validate(k_fold=5, type_=None):
 
     all_trigs = np.array(ac.train_triggers + ac.val_triggers + ac.test_triggers)
 
-    kf = KFold(len(all_trigs), n_folds=k_fold, shuffle=True, random_state=111)
+    kf = KFold(len(all_trigs), n_folds=k_fold, shuffle=True, random_state=5143580734)
 
     accs = []
     baseline_accs = []
@@ -69,11 +69,11 @@ def cross_validate(k_fold=5, type_=None):
     return results
 
 def log_results(results_lst):
-    with open('ANT_CROSS_VALIDATION_RESULTS.txt', 'a') as f:
+    with open('ANT_CROSS_VALIDATION_RESULTS_RANDSEED_5143580734.txt', 'a') as f:
         for result_str in results_lst:
             f.write(result_str)
 
 if __name__ == '__main__':
-    for type_ in ['do','be','to','modal','have','so']:
+    for type_ in [None,'do','be','to','modal','have','so']:
         results_lst = cross_validate(type_=type_)
         log_results(results_lst)
