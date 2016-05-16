@@ -20,23 +20,30 @@ ALL_CATEGORIES = [MODALS, BE, HAVE, DO, TO, SO]
 ALL_AUXILIARIES = Files().extract_data_from_file(Files.UNIQUE_AUXILIARIES_FILE)
 
 """ ---- Exception classes. ---- """
-class AuxiliaryHasNoTypeException:
+
+
+class AuxiliaryHasNoTypeException(BaseException):
     def __init__(self, aux_name):
-        print 'The following auxiliary, %s, has no category!'%aux_name
+        print 'The following auxiliary, %s, has no category!' % aux_name
 
-class EmptySentDictException:
+
+class EmptySentDictException(BaseException):
     def __init__(self): pass
 
-class GoldStandardComesFromRawException:
+
+class GoldStandardComesFromRawException(BaseException):
     def __init__(self): pass
 
-class NoSubsequenceFoundException:
+
+class NoSubsequenceFoundException(BaseException):
     def __init__(self): pass
 
-class Finished:
+
+class Finished(BaseException):
     def __init__(self): pass
 
-class WrongClassEquivalenceException:
+
+class WrongClassEquivalenceException(BaseException):
     def __init__(self): pass
 
 def ant_after_trigger(sentnum,i,j,trig):
@@ -56,8 +63,11 @@ def ant_after_trigger(sentnum,i,j,trig):
 
 
 """ ---- Data importation classes. ---- """
-class AllSentences:
+
+
+class AllSentences(object):
     """ A class that contains all of the StanfordCoreNLP sentences. """
+
     def __init__(self):
         self.sentences = []
 
@@ -100,12 +110,14 @@ class AllSentences:
         vp = None
         sent = None
         try:
-            vp,start,end = nt.get_nearest_vp_exceptional(self.get_sentence_tree(trigger.sentnum), trigger.wordnum-1, trigger, trigger.sentnum) # Go behind trigger.
+            vp, start, end = nt.get_nearest_vp_exceptional(self.get_sentence_tree(trigger.sentnum), trigger.wordnum - 1,
+                                                           trigger, trigger.sentnum)  # Go behind trigger.
             sent = trigger.sentnum
         except nt.NoVPException:
-            for sentnum in reversed(range(trigger.sentnum-2, trigger.sentnum)):
+            for sentnum in reversed(range(trigger.sentnum - 2, trigger.sentnum)):
                 try:
-                    vp,start,end = nt.get_nearest_vp_exceptional(self.get_sentence_tree(sentnum), len(self[sentnum])-2, trigger, sentnum)
+                    vp, start, end = nt.get_nearest_vp_exceptional(self.get_sentence_tree(sentnum),
+                                                                   len(self[sentnum]) - 2, trigger, sentnum)
                     sent = sentnum
                 except nt.NoVPException:
                     continue
@@ -115,70 +127,71 @@ class AllSentences:
         return self.idxs_to_ant(sent, start, end, trigger)
 
     def set_possible_ants(self, trigger, pos_tests):
-        for sentnum in range(max(0, trigger.sentnum - SENTENCE_SEARCH_DISTANCE), trigger.sentnum+1):
+        for sentnum in range(max(0, trigger.sentnum - SENTENCE_SEARCH_DISTANCE), trigger.sentnum + 1):
             functions = [f for f in pos_tests if hasattr(f, '__call__')]
 
             for i in range(len(self.sentences[sentnum])):
-                 tag = self.sentences[sentnum].pos[i]
+                tag = self.sentences[sentnum].pos[i]
 
-                 # TODO: ADDED SECOND CLAUSE TO THIS IF TO LOWER NUMBER OF CANDIDATES GENERATED
-                 if True in (f(tag) for f in functions): #and not wc.is_aux_lemma(self.sentences[sentnum].lemmas[i]):
-                     phrase = nt.get_nearest_phrase(nt.maketree(self.sentences[sentnum]['tree'][0]), i, pos_tests)
-                     phrase_length = nt.get_phrase_length(phrase)
+                # TODO: ADDED SECOND CLAUSE TO THIS IF TO LOWER NUMBER OF CANDIDATES GENERATED
+                if True in (f(tag) for f in functions):  # and not wc.is_aux_lemma(self.sentences[sentnum].lemmas[i]):
+                    phrase = nt.get_nearest_phrase(nt.maketree(self.sentences[sentnum]['tree'][0]), i, pos_tests)
+                    phrase_length = nt.get_phrase_length(phrase)
 
-                     # if phrase_length <= 2:
-                     #     print phrase
+                    # if phrase_length <= 2:
+                    #     print phrase
 
-                     for j in range(i, min(i+phrase_length+1, len(self.sentences[sentnum]))):
-                         if not ant_after_trigger(sentnum, i, j, trigger):
-                             bad = False
-                             for pos_check in [wc.is_preposition, wc.is_punctuation, wc.is_determiner]:
-                                 if pos_check(self.sentences[sentnum].pos[j-1]):
-                                     bad = True
+                    for j in range(i, min(i + phrase_length + 1, len(self.sentences[sentnum]))):
+                        if not ant_after_trigger(sentnum, i, j, trigger):
+                            bad = False
+                            for pos_check in [wc.is_preposition, wc.is_punctuation, wc.is_determiner]:
+                                if pos_check(self.sentences[sentnum].pos[j - 1]):
+                                    bad = True
 
-                             if not bad:
-                                 ant = self.idxs_to_ant(sentnum, i, j, trigger)
-                                 if len(ant.sub_sentdict) > 0:
-                                     trigger.add_possible_ant(ant)
+                            if not bad:
+                                ant = self.idxs_to_ant(sentnum, i, j, trigger)
+                                if len(ant.sub_sentdict) > 0:
+                                    trigger.add_possible_ant(ant)
 
-            #Lets use the tree to decrease the number of dumb candidates.
+                                    # Lets use the tree to decrease the number of dumb candidates.
 
-            # phrases = [p for p in pos_tests if type(p)==str]
-            # tree = nt.maketree(self.get_sentence(sentnum)['tree'][0])
-            # tree_pos = nt.getsmallestsubtrees(tree)
-            # tree_words = tree.leaves()
-            # leaves_dict = { (tree_pos[i].label(), tree_words[i]) : i+1 for i in range(len(tree_words))}
-            #                 start = end
-            #
-            #             if sentnum == trigger.sentnum and leaves_dict[end] == trigger.wordnum or wc.is_punctuation(end[0]):
-            #                 break
-            #
-            #             ant = self.idxs_to_ant(sentnum, leaves_dict[start], leaves_dict[end]+1, trigger)
-            #
-            #             i,j = leaves_dict[start],leaves_dict[end]
-            #             if len(ant.sub_sentdict) > 0 and not ant_after_trigger(sentnum, start, end, trigger)\
-            #                 and not ((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger) in new_ants):
-            #
-            #                 bad = False
-            #                 for pos_check in [wc.is_preposition, wc.is_punctuation]:
-            #                     if pos_check(self.sentences[sentnum].pos[j-1]):
-            #                         bad = True
-            #                 if not bad:
-            #                     ant = self.idxs_to_ant(sentnum, i, j, trigger)
-            #                     if len(ant.sub_sentdict) > 0:
-            #                         trigger.add_possible_ant(ant)
-            #                         new_ants.append((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger))
+                                    # phrases = [p for p in pos_tests if type(p)==str]
+                                    # tree = nt.maketree(self.get_sentence(sentnum)['tree'][0])
+                                    # tree_pos = nt.getsmallestsubtrees(tree)
+                                    # tree_words = tree.leaves()
+                                    # leaves_dict = { (tree_pos[i].label(), tree_words[i]) : i+1 for i in range(len(tree_words))}
+                                    #                 start = end
+                                    #
+                                    #             if sentnum == trigger.sentnum and leaves_dict[end] == trigger.wordnum or wc.is_punctuation(end[0]):
+                                    #                 break
+                                    #
+                                    #             ant = self.idxs_to_ant(sentnum, leaves_dict[start], leaves_dict[end]+1, trigger)
+                                    #
+                                    #             i,j = leaves_dict[start],leaves_dict[end]
+                                    #             if len(ant.sub_sentdict) > 0 and not ant_after_trigger(sentnum, start, end, trigger)\
+                                    #                 and not ((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger) in new_ants):
+                                    #
+                                    #                 bad = False
+                                    #                 for pos_check in [wc.is_preposition, wc.is_punctuation]:
+                                    #                     if pos_check(self.sentences[sentnum].pos[j-1]):
+                                    #                         bad = True
+                                    #                 if not bad:
+                                    #                     ant = self.idxs_to_ant(sentnum, i, j, trigger)
+                                    #                     if len(ant.sub_sentdict) > 0:
+                                    #                         trigger.add_possible_ant(ant)
+                                    #                         new_ants.append((sentnum, leaves_dict[start], leaves_dict[end]+1, trigger))
 
-                            # print 'added poss_ant: %d to %d'%(leaves_dict[start], leaves_dict[end]+1),trigger.possible_ants[-1]
+                                    # print 'added poss_ant: %d to %d'%(leaves_dict[start], leaves_dict[end]+1),trigger.possible_ants[-1]
 
-                    # raise Finished()
+                                    # raise Finished()
 
     def set_possible_ants2(self, trigger, train_pos_starts_lengths):
-        for sentnum in range(max(0, trigger.sentnum - SENTENCE_SEARCH_DISTANCE), trigger.sentnum+1):
+        for sentnum in range(max(0, trigger.sentnum - SENTENCE_SEARCH_DISTANCE), trigger.sentnum + 1):
             for i in range(len(self.sentences[sentnum])):
                 tag = self.sentences[sentnum].pos[i]
                 if tag in train_pos_starts_lengths:
-                    for j in range(i+1, min(len(self.sentences[sentnum]), 99 if sentnum!=trigger.sentnum else trigger.wordnum)):
+                    for j in range(i + 1, min(len(self.sentences[sentnum]),
+                                              99 if sentnum != trigger.sentnum else trigger.wordnum)):
                         trigger.add_possible_ant(self.idxs_to_ant(sentnum, i, j, trigger))
 
     def idxs_to_ant(self, sentnum, start, end, trigger):
@@ -188,13 +201,15 @@ class AllSentences:
                           SubSentDict(sentdict.words[start:end],
                                       sentdict.pos[start:end],
                                       sentdict.lemmas[start:end]),
-                          start, end-1)
+                          start, end - 1)
 
     def get_sentence_tree(self, i):
         return nt.maketree(self.sentences[i]['tree'][0])
 
-class XMLMatrix:
+
+class XMLMatrix(object):
     """ A matrix of SentDicts built by getting passed a Stanford CoreNLP XML file. """
+
     def __init__(self, xml_file, path, pos_file=False, get_deps=False):
         if not xml_file in listdir(path):
             raise IOError
@@ -202,9 +217,9 @@ class XMLMatrix:
         self.matrix = []
         self.file_name = xml_file
         self.pos_file = pos_file
-        print 'Processing: %s' %xml_file
+        print 'Processing: %s' % xml_file
         parser = ET.XMLParser()
-        tree = ET.parse(path+xml_file, parser=parser)
+        tree = ET.parse(path + xml_file, parser=parser)
         root = tree.getroot()
 
         # For each <sentence> in the file...
@@ -240,15 +255,15 @@ class XMLMatrix:
             for j in range(len(sentdict)):
                 if sentdict.words[j] == words[0]:
                     count = 0
-                    start = (i,j)
-                    end = (-1,-1)
-                    for k in range(j, min(len(sentdict), j+len(words))):
+                    start = (i, j)
+                    end = (-1, -1)
+                    for k in range(j, min(len(sentdict), j + len(words))):
                         if sentdict.words[k] == words[count]:
                             count += 1
-                        end = (i,k)
+                        end = (i, k)
 
                     if count >= minimum_match:
-                        return start,end
+                        return start, end
                     else:
                         continue
         raise NoSubsequenceFoundException()
@@ -264,7 +279,8 @@ class XMLMatrix:
 
     def get_gs_auxiliaries(self, annotations, sentnum_modifier):
         parser = ET.XMLParser()
-        tree = ET.parse(Files.XML_RAW_TOKENIZED+self.get_subdir()+Files.SLASH_CHAR+self.file_name[0:8]+'.xml', parser=parser)
+        tree = ET.parse(Files.XML_RAW_TOKENIZED + self.get_subdir() + Files.SLASH_CHAR + self.file_name[0:8] + '.xml',
+                        parser=parser)
         root = tree.getroot()
 
         ann_num = 0
@@ -277,7 +293,7 @@ class XMLMatrix:
         for sentence in root.iter('sentence'):
             try:
                 s = SentDict(sentence, raw=True)
-                for i in range(0,len(s)):
+                for i in range(0, len(s)):
                     if s.offset_starts[i] == crt_annotation.vpe_offset_start:
                         raw_gold_indexes.append(len(raw_all_auxiliaries.auxs))
                         raw_gold_auxiliaries.append(RawAuxiliary(s.words[i], i, s.sentnum))
@@ -296,7 +312,8 @@ class XMLMatrix:
             print '\nAnnotations:'
             for ann in annotations:
                 print ann
-            print 'Number of auxs we got: %d, number of annotations for file %s: %d.'%(len(raw_gold_auxiliaries),crt_annotation.file,len(annotations))
+            print 'Number of auxs we got: %d, number of annotations for file %s: %d.' % (
+                len(raw_gold_auxiliaries), crt_annotation.file, len(annotations))
             raise Exception('Error! When extracting the annotations using the raw data, we didn\'t get the correct number of auxiliaries!')
 
         """ Now that we got the auxiliaries according to their location/offsets within the raw text files (above),
@@ -312,10 +329,11 @@ class XMLMatrix:
         if len(raw_all_auxiliaries.auxs) == len(mrg_raw_type_auxiliaries.auxs):
             for raw_aux_idx in raw_gold_indexes:
                 raw_aux = mrg_raw_type_auxiliaries.auxs[raw_aux_idx]
-                aux_sentdict = self.matrix[raw_aux.sentnum-1]
+                aux_sentdict = self.matrix[raw_aux.sentnum - 1]
                 idx = raw_aux.wordnum
 
-                mrg_aux = Auxiliary(aux_sentdict.sentnum+sentnum_modifier, aux_sentdict.words[idx], aux_sentdict.lemmas[idx], aux_sentdict.pos[idx], idx)
+                mrg_aux = Auxiliary(aux_sentdict.sentnum + sentnum_modifier, aux_sentdict.words[idx],
+                                    aux_sentdict.lemmas[idx], aux_sentdict.pos[idx], idx)
                 gold_standard.append(mrg_aux)
 
         return gold_standard
@@ -323,7 +341,8 @@ class XMLMatrix:
     def get_gs_antecedents(self, annotations, triggers, sentnum_modifier):
         """Finds the gold standard antecedents using the old raw xml files and annotations to link to mrg xmls."""
         parser = ET.XMLParser()
-        tree = ET.parse(Files.XML_RAW_TOKENIZED+self.get_subdir()+Files.SLASH_CHAR+self.file_name[0:8]+'.xml', parser=parser)
+        tree = ET.parse(Files.XML_RAW_TOKENIZED + self.get_subdir() + Files.SLASH_CHAR + self.file_name[0:8] + '.xml',
+                        parser=parser)
         root = tree.getroot()
 
         ann_num = 0
@@ -339,12 +358,14 @@ class XMLMatrix:
                     got = False
                     while i < len(s):
                         # print s.offset_starts[i],crt_annotation.ant_offset_start
-                        if got or s.offset_starts[i] in range(crt_annotation.ant_offset_start-1,crt_annotation.ant_offset_start+2): #TODO: I MADE THIS LESS STRICT
+                        if got or s.offset_starts[i] in range(crt_annotation.ant_offset_start - 1,
+                                                              crt_annotation.ant_offset_start + 2):  # TODO: I MADE THIS LESS STRICT
                             ant_words.append(s.words[i])
                             if not got:
                                 ant_start = i
                                 got = True
-                            if s.offset_ends[i] in range(crt_annotation.ant_offset_end-1, crt_annotation.ant_offset_end+2):
+                            if s.offset_ends[i] in range(crt_annotation.ant_offset_end - 1,
+                                                         crt_annotation.ant_offset_end + 2):
                                 ann_num += 1
                                 raw_gold_ants.append(RawAntecedent(ant_words, ant_start, i, s.sentnum))
                                 try:
@@ -353,7 +374,7 @@ class XMLMatrix:
                                     raise Finished()
                                 ant_words = []
                                 got = False
-                        i+=1
+                        i += 1
                     raw_matrix.append(s)
                 except EmptySentDictException:
                     continue
@@ -363,7 +384,8 @@ class XMLMatrix:
             print '\nAnnotations:'
             for ann in annotations:
                 print ann
-            print 'Number of ants we got: %d, number of annotations for file %s: %d.'%(len(raw_gold_ants),crt_annotation.file,len(annotations))
+            print 'Number of ants we got: %d, number of annotations for file %s: %d.' % (
+            len(raw_gold_ants), crt_annotation.file, len(annotations))
             assert False
             # raise Exception('Error! When extracting the annotations using the raw data, we didn\'t get the correct number of antecedents!')
 
@@ -379,9 +401,9 @@ class XMLMatrix:
             k = len(raw_ant.words)
             while True:
                 try:
-                    start_idx,end_idx = self.find_word_sequence(raw_ant.words, minimum_match=k)
+                    start_idx, end_idx = self.find_word_sequence(raw_ant.words, minimum_match=k)
                     mrg_gold_ants.append(self.idxs_to_ant(start_idx, end_idx, triggers[i], sentnum_modifier))
-                    triggers[i].set_antecedent(mrg_gold_ants[-1]) # Set the trigger to match the gold antecedent.
+                    triggers[i].set_antecedent(mrg_gold_ants[-1])  # Set the trigger to match the gold antecedent.
                     break
                 except NoSubsequenceFoundException:
                     k -= 1
@@ -389,21 +411,24 @@ class XMLMatrix:
 
     def idxs_to_ant(self, start, end, trigger, sentnum_modifier):
         sentdict = self.matrix[start[0]]
-        i,j = start[1],end[1]+1
-        return Antecedent(start[0]+sentnum_modifier+1, trigger, SubSentDict(sentdict.words[i:j], sentdict.pos[i:j], sentdict.lemmas[i:j]), i, j)
+        i, j = start[1], end[1] + 1
+        return Antecedent(start[0] + sentnum_modifier + 1, trigger,
+                          SubSentDict(sentdict.words[i:j], sentdict.pos[i:j], sentdict.lemmas[i:j]), i, j)
 
-class SubSentDict:
+
+class SubSentDict(object):
     """
         Antecedents have this.
         @type words: list
         @type pos: list
         @type lemmas: list
     """
+
     def __init__(self, words, pos, lemmas, start=None, end=None):
         self.words = words
         self.pos = pos
         self.lemmas = lemmas
-        self.start,self.end = start,end
+        self.start, self.end = start, end
 
     def __eq__(self, other):
         if type(self) is type(other):
@@ -416,10 +441,12 @@ class SubSentDict:
         return len(self.words)
 
     def __repr__(self):
-        return str((self.words,self.pos))
+        return str((self.words, self.pos))
 
-class SentDict:
+
+class SentDict(object):
     """ Dictionary for any sentence from a Stanford CoreNLP XML file. Can be modified to have more attributes. """
+
     def __init__(self, sentence, f_name=None, raw=False, get_deps=False):
         self.file = f_name
         self.sentnum = int(sentence.get('id'))
@@ -430,9 +457,9 @@ class SentDict:
             self.tree_text[0] = self.fix_quotes_str(self.tree_text[0])
 
             if len(self.tree_text) != 0:
-                self.words = ['ROOT']+[word.text for word in sentence.iter('word')]
-                self.lemmas = ['root']+[lemma.text for lemma in sentence.iter('lemma')]
-                self.pos = ['root']+[pos.text for pos in sentence.iter('POS')]
+                self.words = ['ROOT'] + [word.text for word in sentence.iter('word')]
+                self.lemmas = ['root'] + [lemma.text for lemma in sentence.iter('lemma')]
+                self.pos = ['root'] + [pos.text for pos in sentence.iter('POS')]
 
                 self.fix_quotes(self.words)
                 self.fix_quotes(self.lemmas)
@@ -440,7 +467,7 @@ class SentDict:
 
                 if get_deps:
                     for dep_type in sentence.iter('dependencies'):
-                        if dep_type.get('type') == "collapsed-ccprocessed-dependencies": #this only happens once
+                        if dep_type.get('type') == "collapsed-ccprocessed-dependencies":  # this only happens once
                             names = [dep.get('type') for dep in dep_type.iter('dep')]
                             govs = [int(gov.get('idx')) for gov in dep_type.iter('governor')]
                             depends = [int(d.get('idx')) for d in dep_type.iter('dependent')]
@@ -458,10 +485,14 @@ class SentDict:
         return len(self.words)
 
     def __getitem__(self, item):
-        if item == 'pos': return self.pos
-        elif item == 'words': return self.words
-        elif item == 'lemmas': return self.lemmas
-        elif item == 'tree': return self.tree_text
+        if item == 'pos':
+            return self.pos
+        elif item == 'words':
+            return self.words
+        elif item == 'lemmas':
+            return self.lemmas
+        elif item == 'tree':
+            return self.tree_text
 
     def __repr__(self):
         return self.words_to_string()
@@ -469,7 +500,7 @@ class SentDict:
     def fix_quotes(self, lst):
         bads = ['``', "''"]
 
-        for i,string in enumerate(lst):
+        for i, string in enumerate(lst):
             if string in bads:
                 lst[i] = "\""
 
@@ -478,17 +509,17 @@ class SentDict:
 
         news = s
         for bad in bads:
-            news = news.replace(bad,"\"")
+            news = news.replace(bad, "\"")
         return news
 
     def get_auxiliaries(self, raw=False):
         sent_auxs = []
-        for i in range(0,len(self)):
+        for i in range(0, len(self)):
             try:
-                if not raw and wc.is_auxiliary(self,i,AUX_LEMMAS,ALL_AUXILIARIES):
+                if not raw and wc.is_auxiliary(self, i, AUX_LEMMAS, ALL_AUXILIARIES):
                     sent_auxs.append(Auxiliary(self.sentnum, self.words[i], self.lemmas[i], self.pos[i], i))
 
-                elif raw and wc.is_auxiliary(self,i,AUX_LEMMAS,ALL_AUXILIARIES,raw=raw):
+                elif raw and wc.is_auxiliary(self, i, AUX_LEMMAS, ALL_AUXILIARIES, raw=raw):
                     sent_auxs.append(RawAuxiliary(self.words[i], i, self.sentnum))
 
             except AuxiliaryHasNoTypeException:
@@ -498,7 +529,7 @@ class SentDict:
     def words_to_string(self):
         s = ''
         for w in self.words:
-            s += w+' '
+            s += w + ' '
         return s
 
     def print_sentence(self):
@@ -520,14 +551,13 @@ class SentDict:
             got = False
             for depname in dep_names:
                 if dep.name.startswith(depname):
-                    got=True
+                    got = True
                     break
             if not got:
                 remove.add(dep)
-        
+
         for dep in remove:
             deps.remove(dep)
-
 
         # This makes it so that the gov is always the smaller one.
         for dep in deps:
@@ -538,7 +568,7 @@ class SentDict:
 
         deps.sort(key=attrgetter('gov'))
 
-        #Here we are removing overlap by making earlier dependency chunks end by at most the index of the next start.
+        # Here we are removing overlap by making earlier dependency chunks end by at most the index of the next start.
         # last_start = -1
         # last_stop = -1
         # for c in range(len(deps)):
@@ -552,13 +582,13 @@ class SentDict:
         # Here we get the dependency constituents for each desired dependency in dep_names.
         chunks = []
         for dep in deps:
-            k, p = dep.gov, dep.dependent+1
-            chunks.append( {'name':dep.name, 'sentdict':SubSentDict( self.words[k:p], self.pos[k:p],
-                                                                     self.lemmas[k:p], start=k, end=p)} )
+            k, p = dep.gov, dep.dependent + 1
+            chunks.append({'name': dep.name, 'sentdict': SubSentDict(self.words[k:p], self.pos[k:p],
+                                                                     self.lemmas[k:p], start=k, end=p)})
 
         if len(chunks) == 0:
-            chunks.append( {'name':'None', 'sentdict':SubSentDict( self.words[i-1:i], self.pos[i-1:i],
-                                                                 self.lemmas[i-1:i], start=i-1, end=i)} )
+            chunks.append({'name': 'None', 'sentdict': SubSentDict(self.words[i - 1:i], self.pos[i - 1:i],
+                                                                   self.lemmas[i - 1:i], start=i - 1, end=i)})
 
         return chunks
 
@@ -568,17 +598,20 @@ def chunks_to_string(chunk):
         s += w+' '
     return s
 
-class Dependency:
+
+class Dependency(object):
     def __init__(self, name, gov, dependent):
-        self.name=name
-        self.gov=gov
-        self.dependent=dependent
+        self.name = name
+        self.gov = gov
+        self.dependent = dependent
 
     def __repr__(self):
-        return '[%s : (%s,%s)]'%(self.name, self.gov, self.dependent)
+        return '[%s : (%s,%s)]' % (self.name, self.gov, self.dependent)
 
-class Annotations:
+
+class Annotations(object):
     """ A class that contains all of the annotations. It is abstract enough to hold Nielson annotations. """
+
     def __init__(self):
         self.matrix = []
 
@@ -590,15 +623,16 @@ class Annotations:
         for annotation in section:
             self.matrix.append(annotation)
 
-class AnnotationSection:
+
+class AnnotationSection(object):
     def __init__(self, subdir, path):
         """ Takes the WSJ subdirectory name and its path to get the Bos & Spenader annotations file. """
         self.matrix = []
 
-        ann_file = subdir[0:2]+'.ann'
-        print '\nProcessing the annotations file: %s'%ann_file
+        ann_file = subdir[0:2] + '.ann'
+        print '\nProcessing the annotations file: %s' % ann_file
 
-        f = open(path+ann_file)
+        f = open(path + ann_file)
         lines = f.readlines()
         f.close()
 
@@ -620,8 +654,10 @@ class AnnotationSection:
         ret = [ann for ann in self if ann.file == f]
         return sorted(ret, key=lambda x: x.vpe_offset_start)
 
-class Annotation:
+
+class Annotation(object):
     """ A B&S annotation, should only be created by the AnnotationSection class. """
+
     def __init__(self, text):
         annotation_text = text.split(' ')
         self.file = annotation_text[0]
@@ -635,10 +671,12 @@ class Annotation:
         del annotation_text
 
     def __repr__(self):
-        return "File: %s, VPE Start,end: %d,%d"%(self.file,self.vpe_offset_start,self.vpe_offset_end)
+        return "File: %s, VPE Start,end: %d,%d" % (self.file, self.vpe_offset_start, self.vpe_offset_end)
 
 """ ---- Auxiliary and Trigger classes. ---- """
-class Auxiliaries:
+
+
+class Auxiliaries(object):
     def __init__(self):
         self.auxs = []
 
@@ -649,7 +687,7 @@ class Auxiliaries:
     def __len__(self):
         return len(self.auxs)
 
-    def get_aux(self,i):
+    def get_aux(self, i):
         return self.auxs[i]
 
     def get_auxs(self):
@@ -671,8 +709,10 @@ class Auxiliaries:
             if aux.is_trigger:
                 print aux
 
-class Auxiliary:
+
+class Auxiliary(object):
     """ Any auxiliary that is encountered is an Auxiliary object. """
+
     def __init__(self, sentnum, word, lemma, pos, wordnum):
         self.type = self.get_type(lemma)
         self.word = word
@@ -686,10 +726,10 @@ class Auxiliary:
 
     def __repr__(self):
         if self.is_trigger:
-            return 'TRIGGER - Type: %s, Lemma: %s, Word: %s, POS: %s, Sentnum: %d, Wordnum: %s'\
-                  %(self.type,self.lemma,self.word,self.pos,self.sentnum,self.wordnum)
-        return 'Not Trigger - Type: %s, Lemma: %s, Word: %s, POS: %s, Sentnum: %d, Wordnum: %s'\
-                  %(self.type,self.lemma,self.word,self.pos,self.sentnum,self.wordnum)
+            return 'TRIGGER - Type: %s, Lemma: %s, Word: %s, POS: %s, Sentnum: %d, Wordnum: %s' \
+                   % (self.type, self.lemma, self.word, self.pos, self.sentnum, self.wordnum)
+        return 'Not Trigger - Type: %s, Lemma: %s, Word: %s, POS: %s, Sentnum: %d, Wordnum: %s' \
+               % (self.type, self.lemma, self.word, self.pos, self.sentnum, self.wordnum)
 
     def equals(self, aux):
         """ Here we only need to compare the sentnum and wordnum because each auxiliary has a unique combination of these two. """
@@ -704,24 +744,34 @@ class Auxiliary:
         self.possible_ants.append(ant)
 
     def get_type(self, lemma):
-        if lemma in MODALS: return 'modal'
-        elif lemma in BE: return 'be'
-        elif lemma in HAVE: return 'have'
-        elif lemma in DO: return 'do'
-        elif lemma in TO: return 'to'
-        elif lemma in SO: return 'so'
+        if lemma in MODALS:
+            return 'modal'
+        elif lemma in BE:
+            return 'be'
+        elif lemma in HAVE:
+            return 'have'
+        elif lemma in DO:
+            return 'do'
+        elif lemma in TO:
+            return 'to'
+        elif lemma in SO:
+            return 'so'
         else:
             raise AuxiliaryHasNoTypeException(lemma)
 
-class RawAuxiliary:
+
+class RawAuxiliary(object):
     """ Only exists for extracting the annotations from the raw XML files. """
+
     def __init__(self, word, wordnum, sentnum):
         self.sentnum = sentnum
         self.word = word
         self.wordnum = wordnum
 
 """" ---- Antecedent classes. ---- """
-class Antecedent:
+
+
+class Antecedent(object):
     def __init__(self, sentnum, trigger, sub_sentdict, start, end, section=-1):
         """
             @type trigger: Auxiliary
@@ -734,14 +784,14 @@ class Antecedent:
         self.sub_sentdict = sub_sentdict
         self.section = section
         self.score = None
-        self.x = None # features
+        self.x = None  # features
         self.start = start
         self.end = end
 
     def __repr__(self):
         ret = ''
         for w in self.sub_sentdict.words:
-            ret += w+' '
+            ret += w + ' '
         return ret
 
     def __eq__(self, other):
@@ -780,7 +830,7 @@ class Antecedent:
                     if idx_in_subsentdict:
                         return i
                     else:
-                        return self.start+i
+                        return self.start + i
                 else:
                     return self.sub_sentdict.words[i]
 
@@ -794,8 +844,10 @@ class Antecedent:
             except IndexError:
                 return ''
 
-class RawAntecedent:
+
+class RawAntecedent(object):
     """ Only exists for extracting the annotations from the raw XML files. """
+
     def __init__(self, words, start, end, sentnum):
         self.words = words
         self.start = start

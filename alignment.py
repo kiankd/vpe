@@ -34,9 +34,6 @@ def alignment_matrix(sentences, trigger, word2vec_dict, dep_names=('prep','adv',
 
     for ant in trigger.possible_ants + [trigger.gold_ant]:
 
-        if ant.get_words() == ['get', 'slightly', 'higher', 'yields'] or ant.get_words() == ['get', 'slightly', 'higher', 'yields','on','deposits']:
-            pass
-
         ant_sentdict = sentences.get_sentence(ant.sentnum)
 
         k,l = nearest_clause(ant_sentdict, ant.start-1, end=ant.end-1)

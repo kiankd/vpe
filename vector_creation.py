@@ -10,7 +10,7 @@ def bool_to_int(boole):
 def int_to_bool(inte):
     return inte == 1
 
-def get_all_features(old_rules = True):
+def get_all_features(old_rules=True):
     if old_rules: rules = 'old_rules'
     else: rules = 'my_rules'
     return ['words','pos','bigrams','my_features',rules,'square_rules','combine_aux_type']
