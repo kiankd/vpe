@@ -315,7 +315,7 @@ class AntecedentClassifier(object):
         return nlargest(k, trigger.possible_ants, key=vpe.Antecedent.get_score)
 
     def build_feature_vectors(self, verbose=True, test_specific=(None, None)):
-
+        vec_length = None
         word2vec_dict = truth.loadword2vecs()
         all_pos_tags = truth.extract_data_from_file(
             truth.EACH_UNIQUE_POS_FILE)  # We only want to import this file once.
@@ -331,11 +331,23 @@ class AntecedentClassifier(object):
                     or (test_specific[0] == trigger.sentnum and test_specific[1] == trigger.wordnum):
 
                 alignment_matrix(self.sentences, trigger, word2vec_dict, dep_names=dep_names, pos_tags=all_pos_tags)
+
                 if trigger == self.train_triggers[0]:
-                    print 'Feature vector length: %d' % len(trigger.gold_ant.x)
+                    vec_length = len(trigger.gold_ant.x)
+                    print 'Feature vector length: %d' % vec_length
+
+                if vec_length:
+                    assert len(trigger.gold_ant.x) == vec_length
+                    for ant in trigger.possible_ants:
+                        assert len(ant.x) == vec_length
+
                 bar.update()
 
         return
+
+    def itertrigs(self):
+        for trig in self.train_triggers + self.val_triggers + self.test_triggers:
+            yield trig
 
     def initialize_weights(self, initial=None, seed=1917):
         np.random.seed(seed)

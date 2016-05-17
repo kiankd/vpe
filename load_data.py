@@ -171,7 +171,8 @@ class Dataset(object):
 
         for lst in train_results,test_results,baseline_results:
             if lst == train_results:
-                print '\nTraining set - average CV results for %s:'%model_name
+                if verbose:
+                    print '\nTraining set - average CV results for %s:'%model_name
             elif lst == test_results:
                 print '\nTesting sets - average CV results for %s:'%model_name
             else:
@@ -320,11 +321,26 @@ def analyze_results(y_true, y_pred, sentences, auxs):
 
 def run_feature_ablation(loaded_data):
     # Features: ['words','pos','bigrams','my_features','old_rules','square_rules','combine_aux_type']
-    features = vc.get_all_features()
+    # features = vc.get_all_features()
+    features = [['words'],
+                ['pos'],
+                ['bigrams'],
+                ['my_features'],
+                ['old_rules'],
+                ['old_rules','square_rules'],
+                ['combine_aux_type']]
+    newf = []
+    for i in range(len(features)):
+        for j in range(i+1, len(features)):
+            newf.append(features[i] + features[j])
 
+    newf.remove(['old_rules','old_rules','square_rules'])
+    features = newf
     for ablated in features:
-        print 'Feature not included: ',ablated
-        ablation_features = [f for f in features if f!=ablated]
+        print 'Only feature included: ',ablated
+        # ablation_features = [f for f in features if f!=ablated]
+        ablation_features = ablated
+
         loaded_data.set_all_auxs(ablation_features, reset=True)
         loaded_data.run_cross_validation(loaded_data.X, loaded_data.Y, LogisticRegressionCV(),
                                          oversample=5, check_fp=False, rand=1489987)
@@ -347,5 +363,5 @@ if __name__ == '__main__':
                 print '------------------------------------------'
 
     if 'ablate' in argv:
-        data = load_data_into_sections(get_mrg=False) #MRG OR NO?
+        data = Dataset.load_dataset(mrg_data=False) #MRG OR NO?
         run_feature_ablation(data)

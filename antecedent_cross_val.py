@@ -14,13 +14,15 @@ C = 5.0
 LR = 0.01
 EPOCHS = 2
 
-def cross_validate(k_fold=5, type_=None, auto_parse=False):
-
-    if auto_parse:
-        ac = load_imported_data_for_antecedent()
+def cross_validate(k_fold=5, type_=None, auto_parse=False, classifier=None):
+    if classifier:
+        ac = classifier
     else:
-        ac = AntecedentClassifier(0, 14, 15, 19, 20, 24)
-        ac.load_imported_data()
+        if auto_parse:
+            ac = load_imported_data_for_antecedent()
+        else:
+            ac = AntecedentClassifier(0, 14, 15, 19, 20, 24)
+            ac.load_imported_data()
 
     ac.initialize_weights()
 
@@ -76,8 +78,35 @@ def cross_validate(k_fold=5, type_=None, auto_parse=False):
     results.append('------------------------------------------------')
     return results
 
-def log_results(results_lst):
-    with open('ANT_CROSS_VALIDATION_RESULTS.txt', 'a') as f:
+def ablation_study(auto_parse=False):
+    if auto_parse:
+        ac = load_imported_data_for_antecedent()
+    else:
+        ac = AntecedentClassifier(0, 14, 15, 19, 20, 24)
+        ac.load_imported_data()
+
+    # This is the division of features by their class:
+    # first excludes the alignment features,
+    # next exclude relational features
+    # next exclude ant_trig relation features
+    # last exclude hardt/nielsen feats
+    feat_dict = {(139,404):'alignment',
+                 (1,139,143,404):'relational',
+                 (1,143,201,404):'ant_trig',
+                 (1,201):'hardt'}
+
+    for tup in feat_dict.iterkeys():
+        for trig in ac.itertrigs():
+            for ant in trig.possible_ants + [trig.gold_ant]:
+                ant.x = [1] + ant.x[tup[0]:tup[1]]
+                if len(tup) == 4:
+                    ant.x += ant.x[tup[2]:tup[3]]
+
+        results = ['----\nFeature excluded: %s' % feat_dict[tup]] + cross_validate(auto_parse=auto_parse, classifier=ac)
+        log_results(results, fname='ANT_FEATURE_ABLATION.txt')
+
+def log_results(results_lst, fname='ANT_CROSS_VALIDATION_RESULTS.txt'):
+    with open(fname, 'a') as f:
         for result_str in results_lst:
             f.write(result_str)
 
@@ -121,12 +150,13 @@ if __name__ == '__main__':
     # ac.import_data(get_mrg=False)
     # save_imported_data_for_antecedent(ac)
     # ac.generate_possible_ants(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb])
+    # ac = load_imported_data_for_antecedent()
     # ac.build_feature_vectors()
     # ac.normalize()
     # save_imported_data_for_antecedent(ac)
-    #
+
     # exit(0)
 
     for type_ in [None,'do','be','to','modal','have','so']:
-        results_lst = cross_validate(type_=type_, auto_parse=True)
+        results_lst = cross_validate(type_=type_, auto_parse=True, classifier=None)
         log_results(results_lst)
