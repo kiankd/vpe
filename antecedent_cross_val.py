@@ -5,6 +5,7 @@ import numpy as np
 import word_characteristics as wc
 from detect_antecedents import AntecedentClassifier
 from sklearn.cross_validation import KFold
+from sys import platform
 
 if platform == 'linux2':
     AUTO_PARSE_NPY_DATA = '../npy_data/antecedent_auto_parse_data_FULL_DATASET.npy'
