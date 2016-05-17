@@ -55,6 +55,17 @@ def alignment_matrix(sentences, trigger, word2vec_dict, dep_names=('prep','adv',
                              + avc.ant_trigger_relationship(ant, trigger, sentences, pos_tags, word2vec_dict)
                              + hardt_features(ant, trigger, sentences, pos_tags))
 
+        print 'TOTOAL LENGTH: ',len(ant.x)
+        a = len(alignment_vector(mapping, untrigs, unants, dep_names, word2vec_dict, verbose=False))
+        r = len(relational_vector(trigger, ant))
+        atr = len(avc.ant_trigger_relationship(ant, trigger, sentences, pos_tags, word2vec_dict))
+        h = len(hardt_features(ant, trigger, sentences, pos_tags))
+        print a
+        print r
+        print atr
+        print h
+        print 1 + a + r + atr + h
+
     # print 'Avg mapping, trig_chunks, ant_chunks lengths: %0.2f, %d, %0.2f'\
     #       %(np.mean(MAPPING_LENGTHS), len(trig_chunks),np.mean(ANT_CHUNK_LENGTHS))
 
@@ -161,7 +172,7 @@ def hardt_features(ant, trig, sentences, pos_tags):
             v.append(1.0 if word in ant_sent.words[ant.end : trig.wordnum] else 0.0)
     else:
         v.append(0.0)
-        for word in continuation_words:
+        for _ in continuation_words:
             v.append(0.0)
     try:
         v.append(1.0 if ant_sent.words[ant.start-1] == trig.word else 0.0)
@@ -318,9 +329,9 @@ def alignment_vector(mapping, un_mapped_trigs, un_mapped_ants, dep_names, word2v
 
     for l in [a,b,c,d]:
         if not l:
-            v += [ 0.0, 0.0 ]
+            v += [0.0, 0.0]
         else:
-            v += [ float(min(l))/max(l), np.mean(l)/max(l) ]
+            v += [float(min(l))/max(l), np.mean(l)/max(l)]
 
     # Now encode the mean and standard deviation of the scores, min and max of scores:
     scores = [tup[2] for tup in mapping]
@@ -410,10 +421,10 @@ def remove_idxs(chunks, start_idx, end_idx):
         for i in range(len(chunk['sentdict'])):
             # print i,i + chunk['sentdict'].start
             if i + chunk['sentdict'].start in indexes_to_remove:
-                if start_remove == None:
+                if start_remove is None:
                     start_remove = i
                 end_remove = i
-        if start_remove == None:
+        if start_remove is None:
             continue
         # print 'Removing:'
         # print chunk['sentdict'].words[start_remove: end_remove+1]
