@@ -5,7 +5,7 @@ import numpy as np
 import word_characteristics as wc
 from detect_antecedents import AntecedentClassifier
 from sklearn.cross_validation import KFold
-from sys import platform
+from sys import platform, argv
 
 if platform == 'linux2':
     AUTO_PARSE_NPY_DATA = '../npy_data/antecedent_auto_parse_data_FULL_DATASET.npy'
@@ -120,7 +120,7 @@ def ablation_study(auto_parse=False, exclude=True):
 
         results = ['----\nFeature: %s\n' % feat_dict[tup]] + ['EXCLUDED' if exclude else 'INLCUDED', '\n'] \
                   + cross_validate(auto_parse=auto_parse, classifier=ac)
-        log_results(results, fname='ANT_FEATURE_ABLATION.txt')
+        log_results(results, fname='ANT_FEATURE_ABLATION_%s.txt'%('EXCLUDED' if exclude else 'INCLUDED'))
 
 def log_results(results_lst, fname='ANT_CROSS_VALIDATION_RESULTS.txt'):
     with open(fname, 'a') as f:
@@ -162,21 +162,24 @@ def load_imported_data_for_antecedent():
     return ac
 
 if __name__ == '__main__':
-    # ac = AntecedentClassifier(0,14,15,19,20,24)
-    # ac.import_data(get_mrg=False)
-    # save_imported_data_for_antecedent(ac)
-    #
-    # ac = load_imported_data_for_antecedent()
-    # ac.generate_possible_ants(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb])
-    # ac.build_feature_vectors()
-    # ac.normalize()
-    # save_imported_data_for_antecedent(ac)
-    #
-    # exit(0)
+    mrg = 'mrg' in argv
 
-    for type_ in [None,'do','be','to','modal','have','so']:
-        results_lst = cross_validate(type_=type_, auto_parse=True, classifier=None)
-        log_results(results_lst, fname='ANT_ALL_TYPES_OF_TRIGS_FULL_DATASET_RESULTS.txt')
+    if 'build' in argv:
+        ac = AntecedentClassifier(0,14,15,19,20,24)
+        ac.import_data(get_mrg=mrg)
+        save_imported_data_for_antecedent(ac)
 
-    # ablation_study(auto_parse=True, exclude=False)
+        ac = load_imported_data_for_antecedent()
+        ac.generate_possible_ants(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb])
+        ac.build_feature_vectors()
+        ac.normalize()
+        save_imported_data_for_antecedent(ac)
+
+    if 'types' in argv:
+        for type_ in [None,'do','be','to','modal','have','so']:
+            results_lst = cross_validate(type_=type_, auto_parse=not mrg, classifier=None)
+            log_results(results_lst, fname='ANT_ALL_TYPES_OF_TRIGS_FULL_DATASET_RESULTS.txt')
+
+    if 'ablate' in argv:
+        ablation_study(auto_parse=not mrg, exclude=True)
 
