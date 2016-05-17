@@ -98,9 +98,11 @@ def ablation_study(auto_parse=False):
     for tup in feat_dict.iterkeys():
         for trig in ac.itertrigs():
             for ant in trig.possible_ants + [trig.gold_ant]:
+                ant.x = list(ant.x)
                 ant.x = [1] + ant.x[tup[0]:tup[1]]
                 if len(tup) == 4:
                     ant.x += ant.x[tup[2]:tup[3]]
+                ant.x = np.array(ant.x)
 
         results = ['----\nFeature excluded: %s' % feat_dict[tup]] + cross_validate(auto_parse=auto_parse, classifier=ac)
         log_results(results, fname='ANT_FEATURE_ABLATION.txt')
