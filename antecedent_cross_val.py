@@ -6,7 +6,10 @@ import word_characteristics as wc
 from detect_antecedents import AntecedentClassifier
 from sklearn.cross_validation import KFold
 
-AUTO_PARSE_NPY_DATA = 'antecedent_auto_parse_data_FULL_DATASET.npy'
+if platform == 'linux2':
+    AUTO_PARSE_NPY_DATA = '../npy_data/antecedent_auto_parse_data_FULL_DATASET.npy'
+elif platform == 'darwin': # mac
+    AUTO_PARSE_NPY_DATA = 'antecedent_auto_parse_data_FULL_DATASET.npy'
 
 # antecedent classifier hyper parameters
 K = 5
