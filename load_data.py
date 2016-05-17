@@ -1,3 +1,4 @@
+# coding=utf-8
 __author__ = 'kian'
 
 import vpe_objects as vpe
@@ -18,7 +19,7 @@ from sklearn.ensemble import RandomForestClassifier
 from scipy.sparse import csr_matrix, vstack
 
 files = Files()
-MRG_DATA_FILE = 'dataset_with_features.npy'
+MRG_DATA_FILE = 'dataset_with_features_ALL_AUXS.npy'
 AUTO_PARSE_FILE = 'auto_parse_with_features_FULL_DATASET.npy'
 AUTO_PARSE_XML_DIR = '/Users/kian/Documents/HONOR/xml_annotations/raw_auto_parse/'
 
@@ -258,7 +259,7 @@ class Section(object):
         return x
 
 
-def load_data_into_sections(get_mrg=True):
+def load_data_into_sections(get_mrg=True, complete_mrg=True):
     dataset = Dataset()
 
     acc_sentnum = -1
@@ -286,8 +287,12 @@ def load_data_into_sections(get_mrg=True):
                 #     raise IOError
 
                 xml_data = vpe.XMLMatrix(f + extension, path)
-            except IOError:  # The file doesn't exist.
-                continue
+
+            except IOError:  # The file doesn't exist as an MRG.
+                if complete_mrg:
+                    xml_data = vpe.XMLMatrix(f + '.pos.xml', Files.XML_POS)
+                else:
+                    continue
 
             auxs += xml_data.get_all_auxiliaries(sentnum_modifier=acc_sentnum).auxs
             gold_auxs += xml_data.get_gs_auxiliaries(annotations.get_anns_for_file(f), acc_sentnum)
@@ -353,7 +358,7 @@ if __name__ == '__main__':
     mrg = 'mrg' in argv
 
     if 'save' in argv:
-        data = load_data_into_sections(get_mrg=mrg)
+        data = load_data_into_sections(get_mrg=mrg, complete_mrg=True)
         data.set_all_auxs()
         data.serialize(mrg_data=mrg)
 

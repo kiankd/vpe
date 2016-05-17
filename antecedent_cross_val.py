@@ -78,14 +78,6 @@ def cross_validate(k_fold=5, type_=None, auto_parse=False, classifier=None):
     results.append('------------------------------------------------')
     return results
 
-def load_classifier(auto_parse=False):
-    if auto_parse:
-        ac = load_imported_data_for_antecedent()
-    else:
-        ac = AntecedentClassifier(0, 14, 15, 19, 20, 24)
-        ac.load_imported_data()
-    return ac
-
 def ablation_study(auto_parse=False, exclude=True):
     # This is the division of features by their class:
     # first excludes the alignment features,
@@ -122,10 +114,24 @@ def ablation_study(auto_parse=False, exclude=True):
                   + cross_validate(auto_parse=auto_parse, classifier=ac)
         log_results(results, fname='ANT_FEATURE_ABLATION_%s.txt'%('EXCLUDED' if exclude else 'INCLUDED'))
 
+def set_classifier_features_to_hardt(ac):
+    for trig in ac.itertrigs():
+        for ant in trig.possible_ants + [trig.gold_ant]:
+            ant.x = np.array(list(ant.x)[:201])
+    return ac
+
 def log_results(results_lst, fname='ANT_CROSS_VALIDATION_RESULTS.txt'):
     with open(fname, 'a') as f:
         for result_str in results_lst:
             f.write(result_str)
+
+def load_classifier(auto_parse=False):
+    if auto_parse:
+        ac = load_imported_data_for_antecedent()
+    else:
+        ac = AntecedentClassifier(0, 14, 15, 19, 20, 24)
+        ac.load_imported_data()
+    return ac
 
 def save_imported_data_for_antecedent(classifier):
     """
@@ -177,9 +183,13 @@ if __name__ == '__main__':
 
     if 'types' in argv:
         for type_ in [None,'do','be','to','modal','have','so']:
+            if 'hardt' in argv:
+                ac = load_classifier(auto_parse=not mrg)
+                ac = set_classifier_features_to_hardt(ac)
+
             results_lst = cross_validate(type_=type_, auto_parse=not mrg, classifier=None)
             log_results(results_lst, fname='ANT_ALL_TYPES_OF_TRIGS_FULL_DATASET_RESULTS.txt')
 
     if 'ablate' in argv:
-        ablation_study(auto_parse=not mrg, exclude=True)
+        ablation_study(auto_parse=not mrg, exclude=False)
 
