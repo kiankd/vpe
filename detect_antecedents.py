@@ -354,6 +354,7 @@ class AntecedentClassifier(object):
         # self.W_old = np.ones(len(self.train_triggers[0].possible_ants[0].x))
         if initial is None:
             self.W_old = np.random.rand(len(self.train_triggers[0].possible_ants[0].x))
+            print 'Weight vector length:',len(self.W_old)
         else:
             self.W_old = initial
         self.W_avg = copy(self.W_old)
@@ -508,8 +509,7 @@ class AntecedentClassifier(object):
                 bestk = self.bestk_ants(trigger, self.W_old, k=k)
 
                 self.W_old = mira.update_weights(self.W_old, bestk, trigger.gold_ant, self.loss_function, C=self.C)
-                self.W_avg = ((1.0 - self.learn_rate(i)) * self.W_avg) + (
-                self.learn_rate(i) * self.W_old)  # Running average.
+                self.W_avg = ((1.0 - self.learn_rate(i)) * self.W_avg) + (self.learn_rate(i) * self.W_old)  # Running average.
                 self.analyze(self.W_avg, features_to_analyze)
                 i += 1
 
@@ -592,7 +592,7 @@ class AntecedentClassifier(object):
         # more than the rest of the words.
 
         if not gold_ant.get_head() in proposed_ant.get_words():
-           return 1.0
+            return 1.0
 
         gold_vals = gold_ant.get_words()
         proposed_vals = proposed_ant.get_words()
