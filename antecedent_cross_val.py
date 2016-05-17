@@ -156,7 +156,9 @@ if __name__ == '__main__':
 
     # exit(0)
 
-    for type_ in [None,'do','be','to','modal','have','so']:
-        results_lst = cross_validate(type_=type_, auto_parse=True, classifier=None)
-        log_results(results_lst)
+    # for type_ in [None,'do','be','to','modal','have','so']:
+    #     results_lst = cross_validate(type_=type_, auto_parse=True, classifier=None)
+    #     log_results(results_lst)
+
+    ablation_study(auto_parse=True)
 
