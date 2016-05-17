@@ -15,7 +15,7 @@ LR = 0.01
 EPOCHS = 2
 
 def cross_validate(k_fold=5, type_=None, auto_parse=False, classifier=None):
-    if classifier:
+    if classifier is not None:
         ac = classifier
     else:
         if auto_parse:
@@ -25,6 +25,8 @@ def cross_validate(k_fold=5, type_=None, auto_parse=False, classifier=None):
             ac.load_imported_data()
 
     ac.initialize_weights()
+    import time
+    time.sleep(5)
 
     ac.C = C
     ac.learn_rate = lambda x: LR
