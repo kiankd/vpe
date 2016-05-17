@@ -188,7 +188,11 @@ if __name__ == '__main__':
                 ac = set_classifier_features_to_hardt(ac)
 
             results_lst = cross_validate(type_=type_, auto_parse=not mrg, classifier=None)
-            log_results(results_lst, fname='ANT_ALL_TYPES_OF_TRIGS_FULL_DATASET_RESULTS.txt')
+
+            if 'hardt' in argv:
+                log_results(results_lst, fname='ANT_ALL_TYPES_OF_TRIGS_FULL_DATASET_RESULTS_HARDT_FEATURES.txt')
+            else:
+                log_results(results_lst, fname='ANT_ALL_TYPES_OF_TRIGS_FULL_DATASET_RESULTS.txt')
 
     if 'ablate' in argv:
         ablation_study(auto_parse=not mrg, exclude=False)
