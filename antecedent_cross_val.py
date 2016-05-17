@@ -183,11 +183,12 @@ if __name__ == '__main__':
 
     if 'types' in argv:
         for type_ in [None,'do','be','to','modal','have','so']:
+            ac = None
             if 'hardt' in argv:
                 ac = load_classifier(auto_parse=not mrg)
                 ac = set_classifier_features_to_hardt(ac)
 
-            results_lst = cross_validate(type_=type_, auto_parse=not mrg, classifier=None)
+            results_lst = cross_validate(type_=type_, auto_parse=not mrg, classifier=ac)
 
             if 'hardt' in argv:
                 log_results(results_lst, fname='ANT_ALL_TYPES_OF_TRIGS_FULL_DATASET_RESULTS_HARDT_FEATURES.txt')
