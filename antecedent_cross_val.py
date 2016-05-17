@@ -6,7 +6,7 @@ import word_characteristics as wc
 from detect_antecedents import AntecedentClassifier
 from sklearn.cross_validation import KFold
 
-AUTO_PARSE_NPY_DATA = '../npy_data/antecedent_auto_parse_data.npy'
+AUTO_PARSE_NPY_DATA = 'antecedent_auto_parse_data.npy'
 
 # antecedent classifier hyper parameters
 K = 5
@@ -25,8 +25,6 @@ def cross_validate(k_fold=5, type_=None, auto_parse=False, classifier=None):
             ac.load_imported_data()
 
     ac.initialize_weights()
-    import time
-    time.sleep(5)
 
     ac.C = C
     ac.learn_rate = lambda x: LR
@@ -36,7 +34,7 @@ def cross_validate(k_fold=5, type_=None, auto_parse=False, classifier=None):
 
     all_trigs = np.array(ac.train_triggers + ac.val_triggers + ac.test_triggers)
 
-    kf = KFold(len(all_trigs), n_folds=k_fold, shuffle=True, random_state=5143580734)
+    kf = KFold(len(all_trigs), n_folds=k_fold, shuffle=True, random_state=848613439)
 
     accs = []
     baseline_accs = []
@@ -98,12 +96,16 @@ def ablation_study(auto_parse=False):
                  (1,201):'hardt'}
 
     for tup in feat_dict.iterkeys():
+        print 'Current excluded feature:',feat_dict[tup]
+        print 'Using tuple: ',tup
         for trig in ac.itertrigs():
             for ant in trig.possible_ants + [trig.gold_ant]:
-                ant.x = list(ant.x)
-                ant.x = [1] + ant.x[tup[0]:tup[1]]
+                l = list(ant.x)
+
+                ant.x = [1] + l[tup[0]:tup[1]]
                 if len(tup) == 4:
-                    ant.x += ant.x[tup[2]:tup[3]]
+                    ant.x += l[tup[2]:tup[3]]
+
                 ant.x = np.array(ant.x)
 
         results = ['----\nFeature excluded: %s' % feat_dict[tup]] + cross_validate(auto_parse=auto_parse, classifier=ac)
