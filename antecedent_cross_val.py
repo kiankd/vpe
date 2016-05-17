@@ -6,7 +6,7 @@ import word_characteristics as wc
 from detect_antecedents import AntecedentClassifier
 from sklearn.cross_validation import KFold
 
-AUTO_PARSE_NPY_DATA = 'antecedent_auto_parse_data.npy'
+AUTO_PARSE_NPY_DATA = '../npy_data/antecedent_auto_parse_data.npy'
 
 # antecedent classifier hyper parameters
 K = 5
@@ -18,11 +18,7 @@ def cross_validate(k_fold=5, type_=None, auto_parse=False, classifier=None):
     if classifier is not None:
         ac = classifier
     else:
-        if auto_parse:
-            ac = load_imported_data_for_antecedent()
-        else:
-            ac = AntecedentClassifier(0, 14, 15, 19, 20, 24)
-            ac.load_imported_data()
+        ac = load_classifier(auto_parse=auto_parse)
 
     ac.initialize_weights()
 
@@ -78,13 +74,15 @@ def cross_validate(k_fold=5, type_=None, auto_parse=False, classifier=None):
     results.append('------------------------------------------------')
     return results
 
-def ablation_study(auto_parse=False):
+def load_classifier(auto_parse=False):
     if auto_parse:
         ac = load_imported_data_for_antecedent()
     else:
         ac = AntecedentClassifier(0, 14, 15, 19, 20, 24)
         ac.load_imported_data()
+    return ac
 
+def ablation_study(auto_parse=False):
     # This is the division of features by their class:
     # first excludes the alignment features,
     # next exclude relational features
@@ -96,6 +94,8 @@ def ablation_study(auto_parse=False):
                  (1,201):'hardt'}
 
     for tup in feat_dict.iterkeys():
+        ac = load_classifier(auto_parse=auto_parse)
+
         print 'Current excluded feature:',feat_dict[tup]
         print 'Using tuple: ',tup
         for trig in ac.itertrigs():
