@@ -6,7 +6,7 @@ import word_characteristics as wc
 from detect_antecedents import AntecedentClassifier
 from sklearn.cross_validation import KFold
 
-AUTO_PARSE_NPY_DATA = '../npy_data/antecedent_auto_parse_data.npy'
+AUTO_PARSE_NPY_DATA = 'antecedent_auto_parse_data_FULL_DATASET.npy'
 
 # antecedent classifier hyper parameters
 K = 5
@@ -82,7 +82,7 @@ def load_classifier(auto_parse=False):
         ac.load_imported_data()
     return ac
 
-def ablation_study(auto_parse=False):
+def ablation_study(auto_parse=False, exclude=True):
     # This is the division of features by their class:
     # first excludes the alignment features,
     # next exclude relational features
@@ -102,13 +102,20 @@ def ablation_study(auto_parse=False):
             for ant in trig.possible_ants + [trig.gold_ant]:
                 l = list(ant.x)
 
-                ant.x = [1] + l[tup[0]:tup[1]]
-                if len(tup) == 4:
-                    ant.x += l[tup[2]:tup[3]]
+                if exclude:
+                    ant.x = [1] + l[tup[0]:tup[1]]
+                    if len(tup) == 4:
+                        ant.x += l[tup[2]:tup[3]]
+                else:
+                    if len(tup) == 2:
+                        ant.x = l[1:tup[0]] + l[tup[1]:]
+                    else:
+                        ant.x = l[tup[1]:tup[2]]
 
                 ant.x = np.array(ant.x)
 
-        results = ['----\nFeature excluded: %s' % feat_dict[tup]] + cross_validate(auto_parse=auto_parse, classifier=ac)
+        results = ['----\nFeature: %s\n' % feat_dict[tup]] + ['EXCLUDED' if exclude else 'INLCUDED', '\n'] \
+                  + cross_validate(auto_parse=auto_parse, classifier=ac)
         log_results(results, fname='ANT_FEATURE_ABLATION.txt')
 
 def log_results(results_lst, fname='ANT_CROSS_VALIDATION_RESULTS.txt'):
@@ -154,17 +161,18 @@ if __name__ == '__main__':
     # ac = AntecedentClassifier(0,14,15,19,20,24)
     # ac.import_data(get_mrg=False)
     # save_imported_data_for_antecedent(ac)
-    # ac.generate_possible_ants(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb])
+    #
     # ac = load_imported_data_for_antecedent()
+    # ac.generate_possible_ants(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb])
     # ac.build_feature_vectors()
     # ac.normalize()
     # save_imported_data_for_antecedent(ac)
-
+    #
     # exit(0)
 
-    # for type_ in [None,'do','be','to','modal','have','so']:
-    #     results_lst = cross_validate(type_=type_, auto_parse=True, classifier=None)
-    #     log_results(results_lst)
+    for type_ in [None,'do','be','to','modal','have','so']:
+        results_lst = cross_validate(type_=type_, auto_parse=True, classifier=None)
+        log_results(results_lst, fname='ANT_ALL_TYPES_OF_TRIGS_FULL_DATASET_RESULTS.txt')
 
-    ablation_study(auto_parse=True)
+    # ablation_study(auto_parse=True, exclude=False)
 

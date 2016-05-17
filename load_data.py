@@ -19,7 +19,7 @@ from scipy.sparse import csr_matrix, vstack
 
 files = Files()
 MRG_DATA_FILE = 'dataset_with_features.npy'
-AUTO_PARSE_FILE = 'auto_parse_with_features.npy'
+AUTO_PARSE_FILE = 'auto_parse_with_features_FULL_DATASET.npy'
 AUTO_PARSE_XML_DIR = '/Users/kian/Documents/HONOR/xml_annotations/raw_auto_parse/'
 
 class Dataset(object):
@@ -268,7 +268,6 @@ def load_data_into_sections(get_mrg=True):
         if d.startswith('.'):
             continue
 
-
         # Get all files we are concerned with. We don't load data from files with no instances of VPE.
         subdir = d + Files.SLASH_CHAR
         annotations = vpe.AnnotationSection(subdir, Files.VPE_ANNOTATIONS)
@@ -283,8 +282,8 @@ def load_data_into_sections(get_mrg=True):
                 path = Files.XML_MRG + subdir if get_mrg else AUTO_PARSE_XML_DIR
 
                 # This condition makes it so that we use the same files for auto-parse dataset results.
-                if not f + '.mrg.xml' in file_list:
-                    raise IOError
+                # if not f + '.mrg.xml' in file_list:
+                #     raise IOError
 
                 xml_data = vpe.XMLMatrix(f + extension, path)
             except IOError:  # The file doesn't exist.
@@ -319,9 +318,9 @@ def analyze_results(y_true, y_pred, sentences, auxs):
             print aux
             print
 
-def run_feature_ablation(loaded_data):
+def run_feature_ablation(loaded_data, exclude=True):
     # Features: ['words','pos','bigrams','my_features','old_rules','square_rules','combine_aux_type']
-    # features = vc.get_all_features()
+    all_features = vc.get_all_features()
     features = [['words'],
                 ['pos'],
                 ['bigrams'],
@@ -335,11 +334,14 @@ def run_feature_ablation(loaded_data):
             newf.append(features[i] + features[j])
 
     newf.remove(['old_rules','old_rules','square_rules'])
-    features = newf
     for ablated in features:
-        print 'Only feature included: ',ablated
-        # ablation_features = [f for f in features if f!=ablated]
-        ablation_features = ablated
+        if exclude:
+            print 'Feature EXCLUDED: ',ablated
+            ablation_features = [f for f in all_features if f not in ablated]
+        else:
+            print 'Only feature included: ',ablated
+            # ablation_features = [f for f in features if f!=ablated]
+            ablation_features = ablated
 
         loaded_data.set_all_auxs(ablation_features, reset=True)
         loaded_data.run_cross_validation(loaded_data.X, loaded_data.Y, LogisticRegressionCV(),
@@ -348,13 +350,15 @@ def run_feature_ablation(loaded_data):
 
 
 if __name__ == '__main__':
+    mrg = 'mrg' in argv
+
     if 'save' in argv:
-        data = load_data_into_sections(get_mrg=False)
+        data = load_data_into_sections(get_mrg=mrg)
         data.set_all_auxs()
-        data.serialize(mrg_data=False)
+        data.serialize(mrg_data=mrg)
 
     if 'load' in argv:
-        data = Dataset.load_dataset(mrg_data=False)
+        data = Dataset.load_dataset(mrg_data=mrg)
         for type_ in ['all','do','to','modal','have','be']:
             type_x, type_y = data.get_auxs_by_type(type_)
             for model in [LogisticRegressionCV()]:#[LogisticRegression(), LogisticRegressionCV(), SVC(), LinearSVC()]:
@@ -363,5 +367,5 @@ if __name__ == '__main__':
                 print '------------------------------------------'
 
     if 'ablate' in argv:
-        data = Dataset.load_dataset(mrg_data=False) #MRG OR NO?
+        data = Dataset.load_dataset(mrg_data=mrg) #MRG OR NO?
         run_feature_ablation(data)
