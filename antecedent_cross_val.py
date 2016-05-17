@@ -15,11 +15,11 @@ LR = 0.01
 EPOCHS = 2
 
 def cross_validate(k_fold=5, type_=None, auto_parse=False):
-    ac = AntecedentClassifier(0, 14, 15, 19, 20, 24)
 
     if auto_parse:
-        ac.load_imported_data(auto_parse_data=True)
+        ac = load_imported_data_for_antecedent()
     else:
+        ac = AntecedentClassifier(0, 14, 15, 19, 20, 24)
         ac.load_imported_data()
 
     ac.initialize_weights()
@@ -119,7 +119,6 @@ if __name__ == '__main__':
     # ac = AntecedentClassifier(0,14,15,19,20,24)
     # ac.import_data(get_mrg=False)
     # save_imported_data_for_antecedent(ac)
-    ac = load_imported_data_for_antecedent()
     # ac.generate_possible_ants(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb])
     # ac.build_feature_vectors()
     # ac.normalize()
