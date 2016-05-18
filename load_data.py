@@ -70,6 +70,16 @@ class Dataset(object):
                 aux.is_trigger = True
                 self.Y[i] = 1
 
+        for aux in self.gold_auxs + self.auxs:
+            sent = self.sentences[aux.sentnum]
+            try:
+                if sent.words[aux.wordnum + 1] == 'so' or sent.words[aux.wordnum + 1] == 'likewise':
+                    aux.type = 'so'
+                if sent.words[aux.wordnum + 1] == 'the' and sent.words[aux.wordnum + 2] in ['same', 'opposite']:
+                    aux.type = 'so'
+            except IndexError:
+                pass
+
     def test_rules(self, train_auxs):
         f = lambda x: 1 if x else 0
 
@@ -353,6 +363,25 @@ def run_feature_ablation(loaded_data, exclude=True):
                                          oversample=5, check_fp=False, rand=1489987)
         print '------------------------------------------'
 
+def analyze_auxs(data):
+    freqs = {}
+    for aux in data.auxs:
+        if aux.type not in freqs:
+            freqs[aux.type] = 1
+        else:
+            freqs[aux.type] += 1
+    gs_freqs = {}
+    for aux in data.gold_auxs:
+        if aux.type not in gs_freqs:
+            gs_freqs[aux.type] = 1
+        else:
+            gs_freqs[aux.type] += 1
+
+    print 'All auxs:'
+    for key in freqs: print key,freqs[key]
+    print '\nGold auxs:'
+    for key in gs_freqs: print key,gs_freqs[key]
+    print 'Total gold auxs:',sum(gs_freqs.itervalues())
 
 if __name__ == '__main__':
     mrg = 'mrg' in argv
@@ -364,7 +393,7 @@ if __name__ == '__main__':
 
     if 'load' in argv:
         data = Dataset.load_dataset(mrg_data=mrg)
-        for type_ in ['all','do','to','modal','have','be']:
+        for type_ in ['all','so','do','to','modal','have','be']:
             type_x, type_y = data.get_auxs_by_type(type_)
             for model in [LogisticRegressionCV()]:#[LogisticRegression(), LogisticRegressionCV(), SVC(), LinearSVC()]:
                 print type_
@@ -374,3 +403,7 @@ if __name__ == '__main__':
     if 'ablate' in argv:
         data = Dataset.load_dataset(mrg_data=mrg) #MRG OR NO?
         run_feature_ablation(data)
+
+    if 'analyze' in argv:
+        data = Dataset.load_dataset(mrg_data=mrg)
+        analyze_auxs(data)

@@ -150,9 +150,10 @@ class AntecedentClassifier(object):
                                 mrg_matrix = vpe.XMLMatrix(f + '.mrg.xml', self.file_names.XML_MRG + subdir, get_deps=True)
                             else:
                                 mrg_matrix = vpe.XMLMatrix(f + '.xml', AUTO_PARSE_XML_DIR, get_deps=True)
+
                         except IOError:
-                            continue
-                            # mrg_matrix = vpe.XMLMatrix(f+'.pos.xml', self.file_names.XML_POS, pos_file=True)
+                            print '(auto-parse file to complete MRG dataset)',
+                            mrg_matrix = vpe.XMLMatrix(f + '.xml', AUTO_PARSE_XML_DIR, pos_file=True)
                             # NO DEPENDENCIES IN POS FILES!
 
                         """ Note that I am using the gold standard triggers here. """

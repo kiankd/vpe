@@ -9,8 +9,10 @@ from sys import platform, argv
 
 if platform == 'linux2':
     AUTO_PARSE_NPY_DATA = '../npy_data/antecedent_auto_parse_data_FULL_DATASET.npy'
-elif platform == 'darwin': # mac
+    GOLD_PARSE_FULL_NPY_DATA = '../npy_data/antecedent_GOLD_parse_data_FULL_DATASET.npy'
+else: # mac
     AUTO_PARSE_NPY_DATA = 'antecedent_auto_parse_data_FULL_DATASET.npy'
+    GOLD_PARSE_FULL_NPY_DATA = 'antecedent_GOLD_parse_data_FULL_DATASET.npy'
 
 # antecedent classifier hyper parameters
 K = 5
@@ -133,7 +135,7 @@ def load_classifier(auto_parse=False):
         ac.load_imported_data()
     return ac
 
-def save_imported_data_for_antecedent(classifier):
+def save_imported_data_for_antecedent(classifier, fname=AUTO_PARSE_NPY_DATA):
     """
     @type classifier: AntecedentClassifier
     """
@@ -150,12 +152,12 @@ def save_imported_data_for_antecedent(classifier):
             classifier.val_triggers, classifier.test_triggers,
             classifier.sentence_words]
 
-    np.save(AUTO_PARSE_NPY_DATA, np.array(data))
+    np.save(fname, np.array(data))
 
-def load_imported_data_for_antecedent():
+def load_imported_data_for_antecedent(fname=AUTO_PARSE_NPY_DATA):
     ac = AntecedentClassifier(0, 14, 15, 19, 20, 24)
 
-    data = np.load(AUTO_PARSE_NPY_DATA)
+    data = np.load(fname)
 
     ac.sentences = data[0]
     ac.train_triggers = data[1]
@@ -169,17 +171,18 @@ def load_imported_data_for_antecedent():
 
 if __name__ == '__main__':
     mrg = 'mrg' in argv
+    save_file = GOLD_PARSE_FULL_NPY_DATA if mrg else AUTO_PARSE_NPY_DATA
 
     if 'build' in argv:
         ac = AntecedentClassifier(0,14,15,19,20,24)
         ac.import_data(get_mrg=mrg)
-        save_imported_data_for_antecedent(ac)
+        save_imported_data_for_antecedent(ac, fname=save_file)
 
         ac = load_imported_data_for_antecedent()
         ac.generate_possible_ants(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb])
         ac.build_feature_vectors()
         ac.normalize()
-        save_imported_data_for_antecedent(ac)
+        save_imported_data_for_antecedent(ac, fname=save_file)
 
     if 'types' in argv:
         for type_ in [None,'do','be','to','modal','have','so']:
@@ -191,9 +194,9 @@ if __name__ == '__main__':
             results_lst = cross_validate(type_=type_, auto_parse=not mrg, classifier=ac)
 
             if 'hardt' in argv:
-                log_results(results_lst, fname='ANT_ALL_TYPES_OF_TRIGS_FULL_DATASET_RESULTS_HARDT_FEATURES.txt')
+                log_results(results_lst, fname='ANT_MRG_ALL_TYPES_OF_TRIGS_FULL_DATASET_RESULTS_HARDT_FEATURES.txt')
             else:
-                log_results(results_lst, fname='ANT_ALL_TYPES_OF_TRIGS_FULL_DATASET_RESULTS.txt')
+                log_results(results_lst, fname='ANT_MRG_ALL_TYPES_OF_TRIGS_FULL_DATASET_RESULTS.txt')
 
     if 'ablate' in argv:
         ablation_study(auto_parse=not mrg, exclude=False)
