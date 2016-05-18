@@ -191,6 +191,9 @@ if __name__ == '__main__':
                 ac = load_classifier(auto_parse=not mrg)
                 ac = set_classifier_features_to_hardt(ac)
 
+            if mrg:
+                ac = load_imported_data_for_antecedent(fname=GOLD_PARSE_FULL_NPY_DATA)
+
             results_lst = cross_validate(type_=type_, auto_parse=not mrg, classifier=ac)
 
             if 'hardt' in argv:
