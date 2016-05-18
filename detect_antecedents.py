@@ -785,14 +785,17 @@ class AntecedentClassifier(object):
             np.save(AUTO_PARSE_NPY_DATA,
                     np.array([self.sentences, self.train_triggers, self.val_triggers, self.test_triggers]))
 
-    def load_imported_data(self, auto_parse_data=False):
+    def load_imported_data(self, auto_parse_data=False, fname=''):
         print 'Loading the data...'
         if 'orig' in sys.argv:
             data = np.load('/home/2014/kkenyo1/vpe_project/npy_data/BEST_RESULTS_SO_FAR_imported_data.npy')
         elif auto_parse_data:
             data = np.load(AUTO_PARSE_NPY_DATA)
         else:
-            data = np.load(self.file_names.IMPORTED_DATA)
+            if fname:
+                data = np.load(fname)
+            else:
+                data = np.load(self.file_names.IMPORTED_DATA)
         self.sentences = data[0]
         self.train_triggers = data[1]
         self.val_triggers = data[2]

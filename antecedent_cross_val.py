@@ -132,7 +132,7 @@ def load_classifier(auto_parse=False):
         ac = load_imported_data_for_antecedent()
     else:
         ac = AntecedentClassifier(0, 14, 15, 19, 20, 24)
-        ac.load_imported_data()
+        ac.load_imported_data(fname=(AUTO_PARSE_NPY_DATA if auto_parse else GOLD_PARSE_FULL_NPY_DATA))
     return ac
 
 def save_imported_data_for_antecedent(classifier, fname=AUTO_PARSE_NPY_DATA):
