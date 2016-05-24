@@ -30,11 +30,13 @@ class Dataset(object):
         self.gold_auxs = []
         self.X = []
         self.Y = []
+        self.section_ends = {k:-1 for k in range(0,25)}
 
     def add(self, section):
         self.sentences += section.sentences
         self.auxs += section.all_auxs
         self.gold_auxs += section.gold_auxs
+        self.section_ends[int(section.section_num)] = len(self.sentences)
 
     def total_length(self):
         return len(self.auxs)
@@ -213,6 +215,9 @@ class Dataset(object):
 
     @classmethod
     def load_dataset(cls, mrg_data=True):
+        """
+        @type return: Dataset
+        """
         print 'Loading data...'
         fname = MRG_DATA_FILE if mrg_data else AUTO_PARSE_FILE
         d = np.load(fname)[0]
@@ -269,14 +274,14 @@ class Section(object):
         return x
 
 
-def load_data_into_sections(get_mrg=True, complete_mrg=True):
+def load_data_into_sections(get_mrg=True, complete_mrg=True, sec_fun=lambda sec: True):
     dataset = Dataset()
 
     acc_sentnum = -1
 
     section_dirs = sorted(listdir(Files.XML_MRG))
     for d in section_dirs:
-        if d.startswith('.'):
+        if d.startswith('.') or not sec_fun(d):
             continue
 
         # Get all files we are concerned with. We don't load data from files with no instances of VPE.
@@ -383,6 +388,52 @@ def analyze_auxs(data):
     for key in gs_freqs: print key,gs_freqs[key]
     print 'Total gold auxs:',sum(gs_freqs.itervalues())
 
+def load_bos_2012_partition():
+    data = Dataset.load_dataset(mrg_data=False)
+
+    train_secs = [0,1,2,3,4,5,6,7,8,10,12,14]
+    test_secs = [9,11,13,15]
+
+    train_auxs = []
+    train_idxs = []
+    test_auxs = []
+    test_idxs = []
+
+    for i,aux in enumerate(data.auxs):
+        if aux.type == 'do': # bos only considered do-vpe
+            section = None # first find section the aux belongs to
+            for sec in sorted(data.section_ends.iterkeys()):
+                if aux.sentnum < data.section_ends[sec]:
+                    section = sec
+                    break
+
+            if section in train_secs:
+                train_auxs.append(aux)
+                train_idxs.append(i)
+
+            if section in test_secs:
+                test_auxs.append(aux)
+                test_idxs.append(i)
+
+    data.X = np.array(data.X)
+    data.Y = np.array(data.Y)
+
+    train_X = data.X[train_idxs]
+    train_Y = data.Y[train_idxs]
+    test_X = data.X[test_idxs]
+    test_Y = data.Y[test_idxs]
+
+    train_X, train_Y = Dataset.oversample(train_X, train_Y, 5)
+
+    print 'Training classifier...'
+    classifier = LogisticRegressionCV()
+    classifier.fit(vstack_csr_vecs(train_X), train_Y)
+
+    predictions = classifier.predict(vstack_csr_vecs(test_X))
+
+    print 'Results acquired from using our algorithm on Bos\' train-test split:'
+    print accuracy_results(test_Y, predictions)
+
 if __name__ == '__main__':
     mrg = 'mrg' in argv
 
@@ -407,3 +458,6 @@ if __name__ == '__main__':
     if 'analyze' in argv:
         data = Dataset.load_dataset(mrg_data=mrg)
         analyze_auxs(data)
+
+    if 'bos' in argv:
+        load_bos_2012_partition()
