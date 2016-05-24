@@ -20,7 +20,13 @@ K = 5
 C = 5.0
 LR = 0.01
 EPOCHS = 2
-seed(1917)
+
+for arg in argv:
+    if arg.startswith('seed='):
+        seed(int(arg.split('seed=')[1]))
+        break
+    else:
+        continue
 
 def init_classifier(auto_parse=True):
     ac = load_classifier(auto_parse=auto_parse)
