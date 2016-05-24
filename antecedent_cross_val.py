@@ -6,7 +6,7 @@ import word_characteristics as wc
 from detect_antecedents import AntecedentClassifier
 from sklearn.cross_validation import KFold
 from sys import platform, argv
-from random import shuffle
+from random import shuffle,seed
 
 if platform == 'linux2':
     AUTO_PARSE_NPY_DATA = '../npy_data/antecedent_auto_parse_data_FULL_DATASET.npy'
@@ -20,6 +20,7 @@ K = 5
 C = 5.0
 LR = 0.01
 EPOCHS = 2
+seed(1917)
 
 def init_classifier(auto_parse=True):
     ac = load_classifier(auto_parse=auto_parse)
