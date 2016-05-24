@@ -118,10 +118,10 @@ def bos_compare():
     shuffle(temp_train)
     div = int(0.8 * len(temp_train))
     temp_val = temp_train[div:]
-    #temp_train = temp_train[:div]
+    temp_train = temp_train[:div]
 
     ac.train_triggers = temp_train
-    ac.val_triggers = temp_test
+    ac.val_triggers = temp_val
     ac.test_triggers = temp_test
 
     val_acc, test_acc = ac.fit(epochs=EPOCHS, k=K)
