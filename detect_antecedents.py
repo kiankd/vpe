@@ -199,8 +199,8 @@ class AntecedentClassifier(object):
         print 'Total triggers: %d'%(len([0 for _ in self.itertrigs()]))
         print 'Total ants: %d'%(len(self.train_ants + self.val_ants + self.test_ants))
 
-    def generate_possible_ants(self, pos_tests, test=0, delete_random=0.0, only_filter=False, strong=False,
-                               test_specific=(None, None)):
+    def generate_possible_ants(self, pos_tests, test=0, only_filter=False, strong=False,
+                               test_specific=(None, None), filter=True):
         """Generate all candidate antecedents."""
         if not only_filter:
             print 'Generating possible antecedents...'
@@ -225,81 +225,81 @@ class AntecedentClassifier(object):
 
         print 'Filtering antecedents out...'
 
+        if filter:
+            # Get POS tags that we can use to filter out the antecedents:
+            all_pos = set()
+            for s in self.sentences:
+                for p in s.pos:
+                    all_pos.add(p)
+            all_pos_combos = set([(a, b) for a in all_pos for b in all_pos])
 
-        # Get POS tags that we can use to filter out the antecedents:
-        all_pos = set()
-        for s in self.sentences:
-            for p in s.pos:
-                all_pos.add(p)
-        all_pos_combos = set([(a, b) for a in all_pos for b in all_pos])
+            ant_start_pos_combo = set()
+            ant_end_pos_combo = set()
+            ant_start_pos = set()
+            ant_end_pos = set()
+            for trig in self.train_triggers:
+                try:
+                    ant_start_pos.add(trig.gold_ant.sub_sentdict.pos[0])
+                    ant_end_pos.add(trig.gold_ant.sub_sentdict.pos[-1])
+                    if len(trig.gold_ant.sub_sentdict) > 1:
+                        ant_start_pos_combo.add((trig.gold_ant.sub_sentdict.pos[0], trig.gold_ant.sub_sentdict.pos[1]))
+                        ant_end_pos_combo.add((trig.gold_ant.sub_sentdict.pos[-1], trig.gold_ant.sub_sentdict.pos[-2]))
+                except IndexError:
+                    print trig.gold_ant.sub_sentdict
+                    print trig
+                    print trig.gold_ant
+                    raise IndexError
 
-        ant_start_pos_combo = set()
-        ant_end_pos_combo = set()
-        ant_start_pos = set()
-        ant_end_pos = set()
-        for trig in self.train_triggers:
-            try:
-                ant_start_pos.add(trig.gold_ant.sub_sentdict.pos[0])
-                ant_end_pos.add(trig.gold_ant.sub_sentdict.pos[-1])
-                if len(trig.gold_ant.sub_sentdict) > 1:
-                    ant_start_pos_combo.add((trig.gold_ant.sub_sentdict.pos[0], trig.gold_ant.sub_sentdict.pos[1]))
-                    ant_end_pos_combo.add((trig.gold_ant.sub_sentdict.pos[-1], trig.gold_ant.sub_sentdict.pos[-2]))
-            except IndexError:
-                print trig.gold_ant.sub_sentdict
-                print trig
-                print trig.gold_ant
-                raise IndexError
+            filter_start_combo = all_pos_combos - ant_start_pos_combo
+            filter_end_combo = all_pos_combos - ant_end_pos_combo
+            filter_start = all_pos - ant_start_pos
+            filter_end = all_pos - ant_end_pos
 
-        filter_start_combo = all_pos_combos - ant_start_pos_combo
-        filter_end_combo = all_pos_combos - ant_end_pos_combo
-        filter_start = all_pos - ant_start_pos
-        filter_end = all_pos - ant_end_pos
+            # Delete antecedents that contain the trigger in them:
+            c = 0
+            duplicates = 0
+            all_ants = set([])
+            for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
+                deletes = []
+                for ant in trigger.possible_ants:
+                    size = len(all_ants)
+                    all_ants.add((ant.sentnum, ant.start, ant.end))
 
-        # Delete antecedents that contain the trigger in them:
-        c = 0
-        duplicates = 0
-        all_ants = set([])
-        for trigger in self.train_triggers + self.val_triggers + self.test_triggers:
-            deletes = []
-            for ant in trigger.possible_ants:
-                size = len(all_ants)
-                all_ants.add((ant.sentnum, ant.start, ant.end))
+                    if False:
+                        pass
 
-                if False:
-                    pass
+                    if ant.sub_sentdict.pos[0] in filter_start:
+                        c += 1
+                        deletes.append(ant)
 
-                if ant.sub_sentdict.pos[0] in filter_start:
-                    c += 1
-                    deletes.append(ant)
+                    elif ant.sub_sentdict.pos[-1] in filter_end:
+                        c += 1
+                        deletes.append(ant)
 
-                elif ant.sub_sentdict.pos[-1] in filter_end:
-                    c += 1
-                    deletes.append(ant)
+                    elif strong and len(ant.sub_sentdict) > 1 and (ant.sub_sentdict.pos[0], ant.sub_sentdict.pos[1]) in filter_start_combo:
+                        c += 1
+                        deletes.append(ant)
 
-                elif strong and len(ant.sub_sentdict) > 1 and (ant.sub_sentdict.pos[0], ant.sub_sentdict.pos[1]) in filter_start_combo:
-                    c += 1
-                    deletes.append(ant)
+                    elif strong and len(ant.sub_sentdict) > 1 and (ant.sub_sentdict.pos[-1], ant.sub_sentdict.pos[-2]) in filter_end_combo:
+                        c += 1
+                        deletes.append(ant)
 
-                elif strong and len(ant.sub_sentdict) > 1 and (ant.sub_sentdict.pos[-1], ant.sub_sentdict.pos[-2]) in filter_end_combo:
-                    c += 1
-                    deletes.append(ant)
+                    elif len(all_ants) == size:
+                        duplicates += 1
+                        deletes.append(ant)
 
-                elif len(all_ants) == size:
-                    duplicates += 1
-                    deletes.append(ant)
+                    elif ant.contains_trigger():
+                        c += 1
+                        deletes.append(ant)
 
-                elif ant.contains_trigger():
-                    c += 1
-                    deletes.append(ant)
+                    elif len(ant.sub_sentdict) == 0:
+                        c += 1
+                        deletes.append(ant)
 
-                elif len(ant.sub_sentdict) == 0:
-                    c += 1
-                    deletes.append(ant)
+                for ant in deletes:
+                    trigger.possible_ants.remove(ant)
 
-            for ant in deletes:
-                trigger.possible_ants.remove(ant)
-
-        print 'Deleted %d bad antecedents!' % c
+            print 'Deleted %d bad antecedents!' % c
 
     def generate_possible_ants2(self):
         tag_length_dict = {}

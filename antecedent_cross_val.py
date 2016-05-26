@@ -290,6 +290,11 @@ def load_imported_data_for_antecedent(fname=AUTO_PARSE_NPY_DATA):
 if __name__ == '__main__':
     mrg = 'mrg' in argv
     save_file = GOLD_PARSE_FULL_NPY_DATA if mrg else AUTO_PARSE_ALL_ANTS_NPY
+    results_save = 'final_results_ALL_TYPES_ALL_ANTS.txt'
+
+    if 'gen2' in argv:
+        AUTO_PARSE_ALL_ANTS_NPY = AUTO_PARSE_ALL_ANTS_NPY[:-4]+'_antgen2.npy'
+        results_save = results_save[:-4]+'_antgen2.txt'
 
     if 'build' in argv:
         # ac = AntecedentClassifier(0,14,15,19,20,24)
@@ -298,10 +303,13 @@ if __name__ == '__main__':
         # exit(0)
 
         ac = load_imported_data_for_antecedent(fname=save_file)
-        ac.generate_possible_ants(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb])
+        ac.generate_possible_ants2()
+        # ac.generate_possible_ants(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb], filter=False)
+        ac.debug_ant_selection()
+        # exit(0)
         ac.build_feature_vectors()
         ac.normalize()
-        save_imported_data_for_antecedent(ac, fname=save_file)
+        save_imported_data_for_antecedent(ac, fname=save_file[:-4]+'_antgen2.npy')
 
     if 'types' in argv:
         for type_ in [None,'do','be','to','modal','have','so']:
@@ -318,7 +326,7 @@ if __name__ == '__main__':
             if 'hardt' in argv:
                 log_results(results_lst, fname='ANT_MRG_ALL_TYPES_OF_TRIGS_FULL_DATASET_RESULTS_HARDT_FEATURES.txt')
             else:
-                log_results(results_lst, fname='final_results_ALL_TYPES_ALL_ANTS.txt')
+                log_results(results_lst, fname=results_save)
 
     if 'ablate' in argv:
         ablation_study(auto_parse=not mrg, exclude=False)

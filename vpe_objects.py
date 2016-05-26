@@ -186,6 +186,7 @@ class AllSentences(object):
                                     # raise Finished()
 
     def set_possible_ants2(self, trigger, train_pos_starts_lengths):
+        trigger.possible_ants = []
         for sentnum in range(max(0, trigger.sentnum - SENTENCE_SEARCH_DISTANCE), trigger.sentnum + 1):
             for i in range(len(self.sentences[sentnum])):
                 tag = self.sentences[sentnum].pos[i]
