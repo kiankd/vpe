@@ -308,3 +308,5 @@ if __name__ == '__main__':
     if 'bos' in argv:
         bos_compare()
 
+    if 'bos_spen' in argv:
+        bos_spen_split()
