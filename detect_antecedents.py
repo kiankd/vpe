@@ -579,9 +579,10 @@ class AntecedentClassifier(object):
         val_preds = self.predict(self.val_triggers)
         test_preds = self.predict(self.test_triggers)
 
-        print 'Validation score using best weight vector: %0.3f'%self.criteria_based_results(val_preds)[1]
-        print 'Test score using best validation weight vector: %0.3f'%self.criteria_based_results(test_preds)[1]
-        
+        print 'Validation head match using best weight vector: %0.4f'%self.criteria_based_results(val_preds)[1]
+        print 'Test head match using best validation weight vector: %0.4f'%self.criteria_based_results(test_preds)[1]
+        print 'Test Bos/Spen ACCURACY using best validation weight vector: %0.4f'%self.accuracy(test_preds)
+
         return self.criteria_based_results(val_preds)[1], self.criteria_based_results(test_preds)[1]
 
     def predict(self, trigger_list):
@@ -852,12 +853,13 @@ class AntecedentClassifier(object):
                 print trig.gold_ant
 
         print 'Baseline results:'
-        print '\tTrain: ', self.criteria_based_results(train_ant_pred)
-        print '\tVal: ', self.criteria_based_results(val_ant_pred)
-        print '\tTest: ', self.criteria_based_results(test_ant_pred)
+        print '\tTrain acc, em, hm, ho: ', self.accuracy(train_ant_pred), self.criteria_based_results(train_ant_pred)
+        print '\tVal acc, em, hm, ho: ', self.accuracy(val_ant_pred), self.criteria_based_results(val_ant_pred)
+        print '\tTest acc, em, hm, ho: ', self.accuracy(test_ant_pred), self.criteria_based_results(test_ant_pred)
+
 
         # return head match % for validation and test results
-        return self.criteria_based_results(val_ant_pred)[1], self.criteria_based_results(test_ant_pred)[2]
+        return self.criteria_based_results(val_ant_pred)[1], self.criteria_based_results(test_ant_pred)[1]
 
     def gold_analysis(self):
         print 'Triggers:',
