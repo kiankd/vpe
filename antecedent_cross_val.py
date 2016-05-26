@@ -9,12 +9,14 @@ from sys import platform, argv
 from random import shuffle,seed
 from load_data import find_section
 
+
+AUTO_PARSE_NPY_DATA = 'antecedent_auto_parse_data_FULL_DATASET.npy'
+GOLD_PARSE_FULL_NPY_DATA = 'antecedent_GOLD_parse_data_FULL_DATASET.npy'
+AUTO_PARSE_ALL_ANTS_NPY = 'antecedent_auto_parse_ALL_ANTS.npy'
+
 if platform == 'linux2':
-    AUTO_PARSE_NPY_DATA = '../npy_data/antecedent_auto_parse_data_FULL_DATASET.npy'
-    GOLD_PARSE_FULL_NPY_DATA = '../npy_data/antecedent_GOLD_parse_data_FULL_DATASET.npy'
-else: # mac
-    AUTO_PARSE_NPY_DATA = 'antecedent_auto_parse_data_FULL_DATASET.npy'
-    GOLD_PARSE_FULL_NPY_DATA = 'antecedent_GOLD_parse_data_FULL_DATASET.npy'
+    for s in AUTO_PARSE_NPY_DATA, GOLD_PARSE_FULL_NPY_DATA, AUTO_PARSE_ALL_ANTS_NPY:
+        s = '../npy_data/'+s
 
 # antecedent classifier hyper parameters
 K = 5
@@ -271,12 +273,13 @@ def load_imported_data_for_antecedent(fname=AUTO_PARSE_NPY_DATA):
 
 if __name__ == '__main__':
     mrg = 'mrg' in argv
-    save_file = GOLD_PARSE_FULL_NPY_DATA if mrg else AUTO_PARSE_NPY_DATA
+    save_file = GOLD_PARSE_FULL_NPY_DATA if mrg else AUTO_PARSE_ALL_ANTS_NPY
 
     if 'build' in argv:
-        ac = AntecedentClassifier(0,14,15,19,20,24)
-        ac.import_data(get_mrg=mrg)
-        save_imported_data_for_antecedent(ac, fname=save_file)
+        # ac = AntecedentClassifier(0,14,15,19,20,24)
+        # ac.import_data(get_mrg=mrg)
+        # save_imported_data_for_antecedent(ac, fname=save_file)
+        # exit(0)
 
         ac = load_imported_data_for_antecedent(fname=save_file)
         ac.generate_possible_ants(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb])

@@ -36,7 +36,10 @@ def alignment_matrix(sentences, trigger, word2vec_dict, dep_names=('prep','adv',
 
         ant_sentdict = sentences.get_sentence(ant.sentnum)
 
-        k,l = nearest_clause(ant_sentdict, ant.start-1, end=ant.end-1)
+        try:
+            k,l = nearest_clause(ant_sentdict, ant.start-1, end=ant.end-1)
+        except AttributeError:
+            k,l = ant.start, ant.end
 
         # if ant.sentnum == trigger.sentnum and k < l:
         #     l = min(l, i) # we don't want the nearest clause to include the trigger's clause.
@@ -444,6 +447,8 @@ def remove_idxs(chunks, start_idx, end_idx):
 
 def nearest_clause(s, start, end=None):
     clause = get_nearest_clause(s.get_nltk_tree(), start, end=end)
+    if clause is None:
+        raise AttributeError()
     return find_word_sequence(s.words, clause.leaves())
 
 def find_word_sequence(words, targets):

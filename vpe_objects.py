@@ -385,7 +385,7 @@ class XMLMatrix(object):
             for ann in annotations:
                 print ann
             print 'Number of ants we got: %d, number of annotations for file %s: %d.' % (
-            len(raw_gold_ants), crt_annotation.file, len(annotations))
+                len(raw_gold_ants), crt_annotation.file, len(annotations))
             assert False
             # raise Exception('Error! When extracting the annotations using the raw data, we didn\'t get the correct number of antecedents!')
 
@@ -409,12 +409,121 @@ class XMLMatrix(object):
                     k -= 1
         return mrg_gold_ants
 
+    def get_gs_antecedents_auto_parse(self, fname, annotations, triggers, sentnum_modifier):
+        parser = ET.XMLParser()
+        tree = ET.parse(fname, parser=parser)
+        root = tree.getroot()
+
+        ants = []
+        annotation_idx = 0
+        repeat_ants = repeating_ants(annotations)
+        try:
+            for sentence in root.iter('sentence'):
+                # print sentence, sentence.get('id')
+                try:
+                    try:
+                        s = SentDict(sentence, raw=True)
+                    except TypeError:
+                        raise Finished()
+
+                    ant_start, ant_end = None, None
+                    for i in range(len(s)):
+                        if s.offset_starts[i] == annotations[annotation_idx].ant_offset_start:
+                            ant_start = i
+
+                        if s.offset_ends[i] == annotations[annotation_idx].ant_offset_end:
+                            ant_end = i
+
+                        # if s.words[i] == 'Crude':
+                        #     print s.offset_starts[i], s.offset_ends[i]
+                        #     print annotations[annotation_idx].ant_offset_start, annotations[annotation_idx].ant_offset_end
+                        #     print ant_start, ant_end
+
+                        if ant_start is not None and ant_end is not None:
+                            ants.append((ant_start, ant_end, s.sentnum))
+                            annotation_idx += 1
+                            ant_start, ant_end = None, None
+
+                            # Sometimes different triggers refer to the same antecedent, see file wsj_1286, for example.
+                            annotation_repeated = ant_is_repeated(annotation_idx, repeat_ants)
+                            while annotation_repeated is not None:
+                                ants.append(tuple([val for val in ants[annotation_repeated]]))
+                                annotation_idx += 1
+                                annotation_repeated = ant_is_repeated(annotation_idx, repeat_ants)
+
+                            if annotation_idx >= len(annotations):
+                                raise Finished()
+
+                    if ant_start and not ant_end:
+                        raise Exception("Fucked up indexes!!")
+
+                except EmptySentDictException:
+                    pass
+        except Finished:
+            pass
+
+        if len(ants) != len(annotations):
+            print '\nAnnotations:'
+            for anno in annotations:
+                print '\t'+anno.ant_print()
+
+            print 'Number of ants we got: %d, number of annotations for file %s: %d.' % (
+                len(ants), annotations[annotation_idx].file, len(annotations))
+
+            raise Exception("Missed!")
+
+        assert len(triggers) == len(ants)
+        final_ants = []
+        for i in range(len(triggers)):
+            trig = triggers[i]
+            final_ants.append(idxs_to_ant2(ants[i][0]+1, ants[i][1]+2, trig, ants[i][2]-1,
+                                           self.matrix[ants[i][2]-1], sentnum_modifier))
+            trig.set_antecedent(final_ants[-1])
+
+        # for ann in annotations:
+        #     print ann.ant_print()
+        # for i in range(len(triggers)):
+        #     print len(self.matrix)
+        #     print final_ants[i].sentnum, '<- ant sentnum'
+        #     print triggers[i].sentnum, '<- trig sentnum'
+        #     print sentnum_modifier, '<- modifier'
+        #     print self.matrix[triggers[i].sentnum - (sentnum_modifier+1)]
+        # print triggers
+        # print final_ants
+        # print
+
+        return final_ants
+
     def idxs_to_ant(self, start, end, trigger, sentnum_modifier):
         sentdict = self.matrix[start[0]]
         i, j = start[1], end[1] + 1
         return Antecedent(start[0] + sentnum_modifier + 1, trigger,
                           SubSentDict(sentdict.words[i:j], sentdict.pos[i:j], sentdict.lemmas[i:j]), i, j)
 
+def idxs_to_ant2(i, j, trigger, sentnum, sentdict, sentnum_modifier):
+    # if i==j:
+    #     raise Exception("Bad antecedent trying to be made! Sentdict: %s" % sentdict.__repr__)
+    # if trigger.sentnum == 200:
+    #     print sentdict
+    #     print sentdict.words[i:j], sentdict.pos[i:j], sentdict.lemmas[i:j]
+    #     print i, j
+    #     print len(sentdict)
+    return Antecedent(sentnum+1+sentnum_modifier, trigger, SubSentDict(sentdict.words[i:j], sentdict.pos[i:j], sentdict.lemmas[i:j]), i, j)
+
+def repeating_ants(annotations):
+    matches = []
+    for i, ann1 in enumerate(annotations):
+        for j in range(i+1,len(annotations)):
+            ann2 = annotations[j]
+            if ann1.ant_offset_start == ann2.ant_offset_start and ann1.ant_offset_end == ann2.ant_offset_end:
+                matches.append((i,j))
+    return matches
+
+def ant_is_repeated(ann_idx, matches):
+    for tup in matches:
+        if ann_idx == tup[1]:
+            return tup[0]
+    return None
 
 class SubSentDict(object):
     """
@@ -545,7 +654,11 @@ class SentDict(object):
 
     def chunked_dependencies(self, i, j, dep_names=None):
         """Here we will return a list of all relevant dependency clusters between word i and word j."""
-        deps = [deepcopy(dep) for dep in self.dependencies if (i <= dep.gov <= j) and (i <= dep.dependent <= j)]
+        try:
+            deps = [deepcopy(dep) for dep in self.dependencies if (i <= dep.gov <= j) and (i <= dep.dependent <= j)]
+        except AttributeError:
+            return []
+
         remove = set()
         for dep in deps:
             got = False
@@ -673,6 +786,9 @@ class Annotation(object):
     def __repr__(self):
         return "File: %s, VPE Start,end: %d,%d" % (self.file, self.vpe_offset_start, self.vpe_offset_end)
 
+    def ant_print(self):
+        return "Ant offset start, end: %d,%d" % (self.ant_offset_start, self.ant_offset_end)
+
 """ ---- Auxiliary and Trigger classes. ---- """
 
 
@@ -789,10 +905,10 @@ class Antecedent(object):
         self.end = end
 
     def __repr__(self):
-        ret = ''
+        ret = '\"'
         for w in self.sub_sentdict.words:
             ret += w + ' '
-        return ret
+        return ret[:-1]+'\"'
 
     def __eq__(self, other):
         if type(other) != type(self):

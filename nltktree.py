@@ -58,7 +58,11 @@ def get_nearest_clause(tree, start, end=None):
         subtree = getsmallestsubtrees(tree)[start]
     else:
         subtrees = getsmallestsubtrees(tree)
-        subtree,subtree2 = subtrees[start],subtrees[end]
+
+        try:
+            subtree,subtree2 = subtrees[start],subtrees[end]
+        except Exception:
+            return None
 
     crt = subtree
     while (not crt is tree) and (not crt.label() in clauses) and ((not end) or not subtree2 in tree):

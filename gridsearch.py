@@ -39,7 +39,7 @@ if __name__ == '__main__':
     a.initialize(['VP', wc.is_adjective, wc.is_verb], seed=9001, save=False, load=True, update=False)
 
     for combo in grid:
-        if not combo in completed:
+        if combo not in completed:
             print "Current Params: ",combo
             a.C = combo[0]
             a.learn_rate = lambda x: combo[1]

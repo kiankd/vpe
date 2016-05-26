@@ -163,18 +163,15 @@ class AntecedentClassifier(object):
                         # self.triggers.add_auxs(mrg_matrix.get_gs_auxiliaries(file_annotations, sentnum_modifier))
                         try:
                             if self.start_train <= dnum <= self.end_train:
-                                self.train_ants += mrg_matrix.get_gs_antecedents(file_annotations, section_triggers,
-                                                                                 sentnum_modifier)
+                                self.train_ants += mrg_matrix.get_gs_antecedents_auto_parse(AUTO_PARSE_XML_DIR + f +'.xml', file_annotations, section_triggers, sentnum_modifier)
                                 self.train_triggers += section_triggers
 
                             if self.start_val <= dnum <= self.end_val:
-                                self.val_ants += mrg_matrix.get_gs_antecedents(file_annotations, section_triggers,
-                                                                               sentnum_modifier)
+                                self.val_ants += mrg_matrix.get_gs_antecedents_auto_parse(AUTO_PARSE_XML_DIR + f +'.xml', file_annotations, section_triggers, sentnum_modifier)
                                 self.val_triggers += section_triggers
 
                             if self.start_test <= dnum <= self.end_test:
-                                self.test_ants += mrg_matrix.get_gs_antecedents(file_annotations, section_triggers,
-                                                                                sentnum_modifier)
+                                self.test_ants += mrg_matrix.get_gs_antecedents_auto_parse(AUTO_PARSE_XML_DIR + f +'.xml', file_annotations, section_triggers, sentnum_modifier)
                                 self.test_triggers += section_triggers
 
                         except AssertionError:
@@ -197,6 +194,10 @@ class AntecedentClassifier(object):
                     trig.type = 'so'
             except IndexError:
                 pass
+
+        print
+        print 'Total triggers: %d'%(len([0 for _ in self.itertrigs()]))
+        print 'Total ants: %d'%(len(self.train_ants + self.val_ants + self.test_ants))
 
     def generate_possible_ants(self, pos_tests, test=0, delete_random=0.0, only_filter=False, strong=False,
                                test_specific=(None, None)):
@@ -237,11 +238,17 @@ class AntecedentClassifier(object):
         ant_start_pos = set()
         ant_end_pos = set()
         for trig in self.train_triggers:
-            ant_start_pos.add(trig.gold_ant.sub_sentdict.pos[0])
-            ant_end_pos.add(trig.gold_ant.sub_sentdict.pos[-1])
-            if len(trig.gold_ant.sub_sentdict) > 1:
-                ant_start_pos_combo.add((trig.gold_ant.sub_sentdict.pos[0], trig.gold_ant.sub_sentdict.pos[1]))
-                ant_end_pos_combo.add((trig.gold_ant.sub_sentdict.pos[-1], trig.gold_ant.sub_sentdict.pos[-2]))
+            try:
+                ant_start_pos.add(trig.gold_ant.sub_sentdict.pos[0])
+                ant_end_pos.add(trig.gold_ant.sub_sentdict.pos[-1])
+                if len(trig.gold_ant.sub_sentdict) > 1:
+                    ant_start_pos_combo.add((trig.gold_ant.sub_sentdict.pos[0], trig.gold_ant.sub_sentdict.pos[1]))
+                    ant_end_pos_combo.add((trig.gold_ant.sub_sentdict.pos[-1], trig.gold_ant.sub_sentdict.pos[-2]))
+            except IndexError:
+                print trig.gold_ant.sub_sentdict
+                print trig
+                print trig.gold_ant
+                raise IndexError
 
         filter_start_combo = all_pos_combos - ant_start_pos_combo
         filter_end_combo = all_pos_combos - ant_end_pos_combo
@@ -269,13 +276,11 @@ class AntecedentClassifier(object):
                     c += 1
                     deletes.append(ant)
 
-                elif strong and len(ant.sub_sentdict) > 1 and (
-                ant.sub_sentdict.pos[0], ant.sub_sentdict.pos[1]) in filter_start_combo:
+                elif strong and len(ant.sub_sentdict) > 1 and (ant.sub_sentdict.pos[0], ant.sub_sentdict.pos[1]) in filter_start_combo:
                     c += 1
                     deletes.append(ant)
 
-                elif strong and len(ant.sub_sentdict) > 1 and (
-                ant.sub_sentdict.pos[-1], ant.sub_sentdict.pos[-2]) in filter_end_combo:
+                elif strong and len(ant.sub_sentdict) > 1 and (ant.sub_sentdict.pos[-1], ant.sub_sentdict.pos[-2]) in filter_end_combo:
                     c += 1
                     deletes.append(ant)
 
