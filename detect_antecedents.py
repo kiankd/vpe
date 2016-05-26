@@ -604,18 +604,18 @@ class AntecedentClassifier(object):
         # weigh the "head" - the first word of the gold_ant
         # more than the rest of the words.
 
-        # if not gold_ant.get_head() in proposed_ant.get_words():
-        #     return 1.0
+        if not gold_ant.get_head() in proposed_ant.get_words():
+            return 1.0
 
         gold_vals = gold_ant.get_words()
         proposed_vals = proposed_ant.get_words()
 
-        tp = float(len([val for val in proposed_vals if val in gold_vals]))
-        fp = float(len([val for val in proposed_vals if not val in gold_vals]))
-        fn = float(len([val for val in gold_vals if not val in proposed_vals]))
+        tp = float(len([0 for val in proposed_vals if val in gold_vals]))
+        # fp = float(len([val for val in proposed_vals if not val in gold_vals]))
+        # fn = float(len([val for val in gold_vals if not val in proposed_vals]))
 
-        precision = tp / (tp + fp)
-        recall = tp / (tp + fn)
+        precision = tp / len(proposed_vals) #(tp + fp)
+        recall = tp / len(gold_vals) #(tp + fn)
 
         if precision == 0.0 or recall == 0.0:
             return 1.0
