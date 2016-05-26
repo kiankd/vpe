@@ -581,9 +581,13 @@ class AntecedentClassifier(object):
 
         print 'Validation head match using best weight vector: %0.4f'%self.criteria_based_results(val_preds)[1]
         print 'Test head match using best validation weight vector: %0.4f'%self.criteria_based_results(test_preds)[1]
-        print 'Test Bos/Spen ACCURACY using best validation weight vector: %0.4f'%self.accuracy(test_preds)
+        print 'Test Bos & Spen ERROR using best validation weight vector: %0.4f'%self.accuracy(test_preds)
 
-        return self.criteria_based_results(val_preds)[1], self.criteria_based_results(test_preds)[1]
+        # returns head match
+        ##return self.criteria_based_results(val_preds)[1], self.criteria_based_results(test_preds)[1]
+
+        # returns bos & spen acc (accuracy function is actually error)
+        return 1.0-self.accuracy(val_preds), 1.0-self.accuracy(test_preds)
 
     def predict(self, trigger_list):
         predictions = []
@@ -853,13 +857,14 @@ class AntecedentClassifier(object):
                 print trig.gold_ant
 
         print 'Baseline results:'
-        print '\tTrain acc, em, hm, ho: ', self.accuracy(train_ant_pred), self.criteria_based_results(train_ant_pred)
-        print '\tVal acc, em, hm, ho: ', self.accuracy(val_ant_pred), self.criteria_based_results(val_ant_pred)
-        print '\tTest acc, em, hm, ho: ', self.accuracy(test_ant_pred), self.criteria_based_results(test_ant_pred)
-
+        print '\tTrain ERROR, em, hm, ho: ', self.accuracy(train_ant_pred), self.criteria_based_results(train_ant_pred)
+        print '\tVal ERROR, em, hm, ho: ', self.accuracy(val_ant_pred), self.criteria_based_results(val_ant_pred)
+        print '\tTest ERROR, em, hm, ho: ', self.accuracy(test_ant_pred), self.criteria_based_results(test_ant_pred)
 
         # return head match % for validation and test results
-        return self.criteria_based_results(val_ant_pred)[1], self.criteria_based_results(test_ant_pred)[1]
+        #return self.criteria_based_results(val_ant_pred)[1], self.criteria_based_results(test_ant_pred)[1]
+        # return bos & spen acc
+        return 1.0-self.accuracy(val_ant_pred), 1.0-self.accuracy(test_ant_pred)
 
     def gold_analysis(self):
         print 'Triggers:',
