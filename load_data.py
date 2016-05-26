@@ -434,6 +434,50 @@ def load_bos_2012_partition():
     print 'Results acquired from using our algorithm on Bos\' train-test split:'
     print accuracy_results(test_Y, predictions)
 
+def bos_train_test_split():
+    data = Dataset.load_dataset(mrg_data=False)
+    train = range(0,15)
+    test = range(20,25)
+
+    train_auxs, test_auxs = [], []
+    train_idxs, test_idxs = [], []
+
+    for i,aux in enumerate(data.auxs):
+        section = find_section(aux.sentnum, data.section_ends)
+
+        if section in train:
+            train_auxs.append(aux)
+            train_idxs.append(i)
+
+        if section in test:
+            test_auxs.append(aux)
+            test_idxs.append(i)
+
+    data.X = np.array(data.X)
+    data.Y = np.array(data.Y)
+
+    train_X = data.X[train_idxs]
+    train_Y = data.Y[train_idxs]
+    test_X = data.X[test_idxs]
+    test_Y = data.Y[test_idxs]
+
+    train_X, train_Y = Dataset.oversample(train_X, train_Y, 5)
+
+    print 'Training classifier...'
+    classifier = LogisticRegressionCV()
+    classifier.fit(vstack_csr_vecs(train_X), train_Y)
+
+    predictions = classifier.predict(vstack_csr_vecs(test_X))
+
+    print 'Results acquired from using our algorithm on the bos train-test split:'
+    print accuracy_results(test_Y, predictions)
+
+
+def find_section(sentnum, section_dict):
+    for sec in sorted(section_dict.iterkeys()):
+        if sentnum < section_dict[sec]:
+            return sec
+
 if __name__ == '__main__':
     mrg = 'mrg' in argv
 
@@ -461,3 +505,6 @@ if __name__ == '__main__':
 
     if 'bos' in argv:
         load_bos_2012_partition()
+
+    if 'bos_spen' in argv:
+        bos_train_test_split()
