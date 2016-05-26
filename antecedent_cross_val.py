@@ -34,7 +34,7 @@ for arg in argv:
         continue
 
 def init_classifier(auto_parse=True):
-    ac = load_classifier(auto_parse=auto_parse)
+    ac = load_classifier(auto_parse=auto_parse, fname=AUTO_PARSE_ALL_ANTS_NPY if auto_parse else GOLD_PARSE_FULL_NPY_DATA)
     ac.initialize_weights(seed=seed)
     ac.C = C
     ac.learn_rate = lambda x: LR
@@ -148,9 +148,12 @@ def bos_compare():
 
 def bos_spen_split():
     ac = init_classifier()
+
     if 'hardt' in argv:
         ac = set_classifier_features_to_hardt(ac)
         ac.initialize_weights(seed=seed)
+
+    ac.debug_ant_selection()
 
     # train_secs = range(0,15)
     # val_secs = range(15,20)
@@ -229,14 +232,20 @@ def set_classifier_features_to_hardt(ac):
             ant.x = np.array(list(ant.x)[:201])
     return ac
 
+# def set_classifier_features_to_alignment(ac):
+#     for trig in ac.itertrigs():
+#         for ant in trig.possible_ants + [trig.gold_ant]:
+#             ant.x = np.array(list(ant.x)[:])
+#     return ac
+
 def log_results(results_lst, fname='ANT_CROSS_VALIDATION_RESULTS.txt'):
     with open(fname, 'a') as f:
         for result_str in results_lst:
             f.write(result_str)
 
-def load_classifier(auto_parse=False):
+def load_classifier(auto_parse=False, fname=None):
     if auto_parse:
-        ac = load_imported_data_for_antecedent()
+        ac = load_imported_data_for_antecedent(fname=fname)
     else:
         ac = AntecedentClassifier(0, 14, 15, 19, 20, 24)
         ac.load_imported_data(fname=(AUTO_PARSE_NPY_DATA if auto_parse else GOLD_PARSE_FULL_NPY_DATA))
@@ -296,7 +305,7 @@ if __name__ == '__main__':
         for type_ in [None,'do','be','to','modal','have','so']:
             ac = None
             if 'hardt' in argv:
-                ac = load_classifier(auto_parse=not mrg)
+                ac = load_classifier(auto_parse=not mrg, fname=AUTO_PARSE_ALL_ANTS_NPY)
                 ac = set_classifier_features_to_hardt(ac)
 
             if mrg:
