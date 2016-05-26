@@ -10,13 +10,14 @@ from random import shuffle,seed
 from load_data import find_section
 
 
-AUTO_PARSE_NPY_DATA = 'antecedent_auto_parse_data_FULL_DATASET.npy'
+AUTO_PARSE_NPY_DATA      = 'antecedent_auto_parse_data_FULL_DATASET.npy'
 GOLD_PARSE_FULL_NPY_DATA = 'antecedent_GOLD_parse_data_FULL_DATASET.npy'
-AUTO_PARSE_ALL_ANTS_NPY = 'antecedent_auto_parse_ALL_ANTS.npy'
+AUTO_PARSE_ALL_ANTS_NPY  = 'antecedent_auto_parse_ALL_ANTS.npy'
 
 if platform == 'linux2':
-    for s in AUTO_PARSE_NPY_DATA, GOLD_PARSE_FULL_NPY_DATA, AUTO_PARSE_ALL_ANTS_NPY:
-        s = '../npy_data/'+s
+    AUTO_PARSE_NPY_DATA      = '../npy_data/' + AUTO_PARSE_NPY_DATA
+    GOLD_PARSE_FULL_NPY_DATA = '../npy_data/' + GOLD_PARSE_FULL_NPY_DATA
+    AUTO_PARSE_ALL_ANTS_NPY  = '../npy_data/' + AUTO_PARSE_ALL_ANTS_NPY
 
 # antecedent classifier hyper parameters
 K = 5
