@@ -148,6 +148,8 @@ def bos_compare():
 
 def bos_spen_split():
     ac = init_classifier()
+    if 'hardt' in argv:
+        ac = set_classifier_features_to_hardt(ac)
 
     # train_secs = range(0,15)
     # val_secs = range(15,20)

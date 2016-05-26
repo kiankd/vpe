@@ -599,8 +599,8 @@ class AntecedentClassifier(object):
         # weigh the "head" - the first word of the gold_ant
         # more than the rest of the words.
 
-        if not gold_ant.get_head() in proposed_ant.get_words():
-            return 1.0
+        # if not gold_ant.get_head() in proposed_ant.get_words():
+        #     return 1.0
 
         gold_vals = gold_ant.get_words()
         proposed_vals = proposed_ant.get_words()
