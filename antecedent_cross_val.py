@@ -44,7 +44,7 @@ def cross_validate(k_fold=5, type_=None, auto_parse=False, classifier=None):
     if classifier is not None:
         ac = classifier
     else:
-        ac = load_classifier(auto_parse=auto_parse)
+        ac = load_classifier(auto_parse=auto_parse, fname=AUTO_PARSE_ALL_ANTS_NPY)
 
     ac.initialize_weights()
 
