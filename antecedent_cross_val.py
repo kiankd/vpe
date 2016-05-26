@@ -6,7 +6,7 @@ import word_characteristics as wc
 from detect_antecedents import AntecedentClassifier
 from sklearn.cross_validation import KFold
 from sys import platform, argv
-from random import shuffle,seed
+from random import shuffle
 from load_data import find_section
 
 
@@ -23,18 +23,19 @@ if platform == 'linux2':
 K = 5
 C = 5.0
 LR = 0.01
-EPOCHS = 2
+EPOCHS = 4
+seed = 347890
 
 for arg in argv:
     if arg.startswith('seed='):
-        seed(int(arg.split('seed=')[1]))
+        seed = int(arg.split('seed=')[1])
         break
     else:
         continue
 
 def init_classifier(auto_parse=True):
     ac = load_classifier(auto_parse=auto_parse)
-    ac.initialize_weights()
+    ac.initialize_weights(seed=seed)
     ac.C = C
     ac.learn_rate = lambda x: LR
     return ac
