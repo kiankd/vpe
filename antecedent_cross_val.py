@@ -273,6 +273,8 @@ def save_imported_data_for_antecedent(classifier, fname=AUTO_PARSE_NPY_DATA):
 def load_imported_data_for_antecedent(fname=AUTO_PARSE_NPY_DATA):
     ac = AntecedentClassifier(0, 14, 15, 19, 20, 24)
 
+    print 'Loading NPY data from this file:',fname
+
     data = np.load(fname)
 
     ac.sentences = data[0]
