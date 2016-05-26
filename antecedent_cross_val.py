@@ -145,30 +145,30 @@ def bos_compare():
 def bos_spen_split():
     ac = init_classifier()
 
-    train_secs = range(0,15)
-    val_secs = range(15,20)
-    test_secs = range(20,25)
-    section_ends = {0: 964, 1: 1538, 2: 2461, 3: 2966, 4: 3661, 5: 4402, 6: 4843, 7: 5721, 8: 6137, 9: 6915, 10: 7606,
-                    11: 8251, 12: 8851, 13: 9621, 14: 10348, 15: 11206, 16: 12337, 17: 12906, 18: 13510, 19: 14152,
-                    20: 14704, 21: 15416, 22: 16419, 23: 17112, 24: 17925}
-
-    train, val, test = [], [], []
-
-    for trig in ac.itertrigs():
-        section = find_section(trig.sentnum, section_ends)
-
-        if section in train_secs:
-            train.append(trig)
-
-        if section in val_secs:
-            val.append(trig)
-
-        if section in test_secs:
-            test.append(trig)
-
-    ac.train_triggers = train
-    ac.val_triggers = val
-    ac.test_triggers = test
+    # train_secs = range(0,15)
+    # val_secs = range(15,20)
+    # test_secs = range(20,25)
+    # section_ends = {0: 964, 1: 1538, 2: 2461, 3: 2966, 4: 3661, 5: 4402, 6: 4843, 7: 5721, 8: 6137, 9: 6915, 10: 7606,
+    #                 11: 8251, 12: 8851, 13: 9621, 14: 10348, 15: 11206, 16: 12337, 17: 12906, 18: 13510, 19: 14152,
+    #                 20: 14704, 21: 15416, 22: 16419, 23: 17112, 24: 17925}
+    #
+    # train, val, test = [], [], []
+    #
+    # for trig in ac.itertrigs():
+    #     section = find_section(trig.sentnum, section_ends)
+    #
+    #     if section in train_secs:
+    #         train.append(trig)
+    #
+    #     if section in val_secs:
+    #         val.append(trig)
+    #
+    #     if section in test_secs:
+    #         test.append(trig)
+    #
+    # ac.train_triggers = train
+    # ac.val_triggers = val
+    # ac.test_triggers = test
 
     val_acc, test_acc = ac.fit(epochs=EPOCHS, k=K)
     bval_acc, btest_acc = ac.baseline_prediction()
@@ -179,7 +179,6 @@ def bos_spen_split():
     print bval_acc, btest_acc
 
     return
-
 
 def ablation_study(auto_parse=False, exclude=True):
     # This is the division of features by their class:
@@ -279,7 +278,7 @@ if __name__ == '__main__':
         ac.import_data(get_mrg=mrg)
         save_imported_data_for_antecedent(ac, fname=save_file)
 
-        ac = load_imported_data_for_antecedent(fname=save_file) # TODO: RERUN BECAUSE WRONG DATA!
+        ac = load_imported_data_for_antecedent(fname=save_file)
         ac.generate_possible_ants(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb])
         ac.build_feature_vectors()
         ac.normalize()

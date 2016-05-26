@@ -69,6 +69,7 @@ class AntecedentClassifier(object):
         self.train_results, self.val_results, self.test_results = [], [], []
         self.diffs = []
 
+        self.section_ends = {x:None for x in range(0, 25)}
         self.sentence_words = []
 
     def reset(self):
@@ -184,6 +185,7 @@ class AntecedentClassifier(object):
                         self.sentences.add_mrg(mrg_matrix)
 
                         sentnum_modifier = len(self.sentences) - 1
+                        self.section_ends[dnum] = len(self.sentences)
             dnum += 1
 
         for trig in self.train_triggers + self.val_triggers + self.test_triggers:
