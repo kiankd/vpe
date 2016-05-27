@@ -587,7 +587,7 @@ class AntecedentClassifier(object):
         ##return self.criteria_based_results(val_preds)[1], self.criteria_based_results(test_preds)[1]
 
         # returns bos & spen acc (accuracy function is actually error)
-        return 1.0-self.accuracy(val_preds), 1.0-self.accuracy(test_preds)
+        return 1.0-self.accuracy(val_preds), 1.0-self.accuracy(test_preds), val_preds, test_preds
 
     def predict(self, trigger_list):
         predictions = []

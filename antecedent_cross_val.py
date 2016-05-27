@@ -21,17 +21,15 @@ if platform == 'linux2':
 
 # antecedent classifier hyper parameters
 K = 5
-C = 2.0
+C = 5.0
 LR = 0.01
-EPOCHS = 5
+EPOCHS = 4
 seed = 347890
 
 for arg in argv:
     if arg.startswith('seed='):
         seed = int(arg.split('seed=')[1])
         break
-    else:
-        continue
 
 def init_classifier(auto_parse=True):
     ac = load_classifier(auto_parse=auto_parse, fname=AUTO_PARSE_ALL_ANTS_NPY if auto_parse else GOLD_PARSE_FULL_NPY_DATA)
@@ -74,7 +72,7 @@ def cross_validate(k_fold=5, type_=None, auto_parse=False, classifier=None):
         ac.val_triggers = list(val)
         ac.test_triggers = list(test)
 
-        val_acc, test_acc = ac.fit(epochs=EPOCHS, k=K)
+        val_acc, test_acc, val_preds, test_preds = ac.fit(epochs=EPOCHS, k=K)
         accs.append((val_acc, test_acc))
 
         bval_acc, btest_acc = ac.baseline_prediction()
@@ -180,7 +178,7 @@ def bos_spen_split():
     # ac.val_triggers = val
     # ac.test_triggers = test
 
-    val_acc, test_acc = ac.fit(epochs=EPOCHS, k=K)
+    val_acc, test_acc, val_preds, test_preds = ac.fit(epochs=EPOCHS, k=K)
     bval_acc, btest_acc = ac.baseline_prediction()
 
     print 'MIRA RESULTS:'
@@ -225,18 +223,6 @@ def ablation_study(auto_parse=False, exclude=True):
         results = ['----\nFeature: %s\n' % feat_dict[tup]] + ['EXCLUDED' if exclude else 'INLCUDED', '\n'] \
                   + cross_validate(auto_parse=auto_parse, classifier=ac)
         log_results(results, fname='feature_ablation_ant_laxloss_%s.txt'%('EXCLUDED' if exclude else 'INCLUDED'))
-
-def set_classifier_features_to_hardt(ac):
-    for trig in ac.itertrigs():
-        for ant in trig.possible_ants + [trig.gold_ant]:
-            ant.x = np.array(list(ant.x)[:201])
-    return ac
-
-# def set_classifier_features_to_alignment(ac):
-#     for trig in ac.itertrigs():
-#         for ant in trig.possible_ants + [trig.gold_ant]:
-#             ant.x = np.array(list(ant.x)[:])
-#     return ac
 
 def log_results(results_lst, fname='ANT_CROSS_VALIDATION_RESULTS.txt'):
     with open(fname, 'a') as f:
@@ -314,22 +300,16 @@ if __name__ == '__main__':
     if 'types' in argv:
         for type_ in [None,'do','be','to','modal','have','so']:
             ac = None
-            if 'hardt' in argv:
-                ac = load_classifier(auto_parse=not mrg, fname=AUTO_PARSE_ALL_ANTS_NPY)
-                ac = set_classifier_features_to_hardt(ac)
 
             if mrg:
                 ac = load_imported_data_for_antecedent(fname=GOLD_PARSE_FULL_NPY_DATA)
 
             results_lst = cross_validate(type_=type_, auto_parse=not mrg, classifier=ac)
 
-            if 'hardt' in argv:
-                log_results(results_lst, fname='ANT_MRG_ALL_TYPES_OF_TRIGS_FULL_DATASET_RESULTS_HARDT_FEATURES.txt')
-            else:
-                log_results(results_lst, fname=results_save)
+            log_results(results_lst, fname=results_save)
 
     if 'ablate' in argv:
-        ablation_study(auto_parse=not mrg, exclude=False)
+        ablation_study(auto_parse=not mrg, exclude=True)
 
     if 'bos' in argv:
         bos_compare()
@@ -344,3 +324,4 @@ if __name__ == '__main__':
         ac.test_triggers = ac.test_triggers[0:2]
         ac.generate_possible_ants(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb])
         ac.build_feature_vectors(debug=True)
+
