@@ -509,7 +509,7 @@ class AntecedentClassifier(object):
             if not has:
                 trig.possible_ants.append(trig.gold_ant)
 
-        best_score = 0.0
+        best_err = 100.0
         best_weights = []
         i=0
         for n in range(epochs):
@@ -553,11 +553,11 @@ class AntecedentClassifier(object):
                 print '\tTrain/val/test HeadO: %0.2f, %0.2f, %0.2f' \
                       % (self.train_results[-1][2], self.val_results[-1][2], self.test_results[-1][2])
 
-                if self.val_results[-1][1] > best_score:
-                    best_score = self.val_results[-1][1]
+                if self.val_err[-1] < best_err:
+                    best_err = self.val_err[-1]
                     best_weights = [copy(self.W_avg)]
 
-                elif self.val_results[-1][1] == best_score:
+                elif self.val_err[-1] == best_err:
                     best_weights.append(copy(self.W_avg))
 
                 # print 'Trigger sentnum,wordnum: %d,%d'%(trigger.sentnum,trigger.wordnum)
