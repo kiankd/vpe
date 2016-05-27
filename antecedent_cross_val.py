@@ -21,9 +21,9 @@ if platform == 'linux2':
 
 # antecedent classifier hyper parameters
 K = 5
-C = 5.0
+C = 2.0
 LR = 0.01
-EPOCHS = 4
+EPOCHS = 5
 seed = 347890
 
 for arg in argv:
@@ -202,7 +202,7 @@ def ablation_study(auto_parse=False, exclude=True):
                  (1,201):'hardt'}
 
     for tup in feat_dict.iterkeys():
-        ac = load_classifier(auto_parse=auto_parse)
+        ac = load_classifier(auto_parse=auto_parse, fname=AUTO_PARSE_ALL_ANTS_NPY)
 
         print 'Current excluded feature:',feat_dict[tup]
         print 'Using tuple: ',tup
@@ -211,7 +211,7 @@ def ablation_study(auto_parse=False, exclude=True):
                 l = list(ant.x)
 
                 if exclude:
-                    ant.x = [1] + l[tup[0]:tup[1]]
+                    ant.x = l[tup[0]:tup[1]]
                     if len(tup) == 4:
                         ant.x += l[tup[2]:tup[3]]
                 else:
@@ -220,11 +220,11 @@ def ablation_study(auto_parse=False, exclude=True):
                     else:
                         ant.x = l[tup[1]:tup[2]]
 
-                ant.x = np.array(ant.x)
+                ant.x = np.array([1] + ant.x)
 
         results = ['----\nFeature: %s\n' % feat_dict[tup]] + ['EXCLUDED' if exclude else 'INLCUDED', '\n'] \
                   + cross_validate(auto_parse=auto_parse, classifier=ac)
-        log_results(results, fname='ANT_FEATURE_ABLATION_%s.txt'%('EXCLUDED' if exclude else 'INCLUDED'))
+        log_results(results, fname='feature_ablation_ant_laxloss_%s.txt'%('EXCLUDED' if exclude else 'INCLUDED'))
 
 def set_classifier_features_to_hardt(ac):
     for trig in ac.itertrigs():
@@ -304,7 +304,7 @@ if __name__ == '__main__':
 
         ac = load_imported_data_for_antecedent(fname=save_file)
         ac.generate_possible_ants2()
-        # ac.generate_possible_ants(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb], filter=False)
+        # ac.generate_possible_ants(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb], filter=True)
         ac.debug_ant_selection()
         # exit(0)
         ac.build_feature_vectors()
@@ -336,3 +336,11 @@ if __name__ == '__main__':
 
     if 'bos_spen' in argv:
         bos_spen_split()
+
+    if 'debug' in argv:
+        ac = load_imported_data_for_antecedent(fname=save_file)
+        ac.train_triggers = ac.train_triggers[0:2]
+        ac.val_triggers = ac.val_triggers[0:2]
+        ac.test_triggers = ac.test_triggers[0:2]
+        ac.generate_possible_ants(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb])
+        ac.build_feature_vectors(debug=True)

@@ -16,7 +16,12 @@ import word_characteristics as wc
 MAPPING_LENGTHS = []
 MAX_SCORE = 4.0
 
-def alignment_matrix(sentences, trigger, word2vec_dict, dep_names=('prep','adv','dobj','nsubj','nmod'), pos_tags=None):
+def alignment_matrix(sentences,
+                     trigger,
+                     word2vec_dict,
+                     dep_names = ('prep','adv','dobj','nsubj','nmod'),
+                     pos_tags = None,
+                     debug = False):
     """
         Creates an alignment vector between the trigger and each of its potential antecedents.
         @type sentences: vpe_objects.AllSentences
@@ -58,16 +63,17 @@ def alignment_matrix(sentences, trigger, word2vec_dict, dep_names=('prep','adv',
                              + avc.ant_trigger_relationship(ant, trigger, sentences, pos_tags, word2vec_dict)
                              + hardt_features(ant, trigger, sentences, pos_tags))
 
-        # print 'TOTOAL LENGTH: ',len(ant.x)
-        # a = len(alignment_vector(mapping, untrigs, unants, dep_names, word2vec_dict, verbose=False))
-        # r = len(relational_vector(trigger, ant))
-        # atr = len(avc.ant_trigger_relationship(ant, trigger, sentences, pos_tags, word2vec_dict))
-        # h = len(hardt_features(ant, trigger, sentences, pos_tags))
-        # print a
-        # print r
-        # print atr
-        # print h
-        # print 1 + a + r + atr + h
+        if debug:
+            print 'TOTOAL LENGTH: ',len(ant.x)
+            a = len(alignment_vector(mapping, untrigs, unants, dep_names, word2vec_dict, verbose=False))
+            r = len(relational_vector(trigger, ant))
+            atr = len(avc.ant_trigger_relationship(ant, trigger, sentences, pos_tags, word2vec_dict))
+            h = len(hardt_features(ant, trigger, sentences, pos_tags))
+            print a
+            print r
+            print atr
+            print h
+            print 1 + a + r + atr + h
 
     # print 'Avg mapping, trig_chunks, ant_chunks lengths: %0.2f, %d, %0.2f'\
     #       %(np.mean(MAPPING_LENGTHS), len(trig_chunks),np.mean(ANT_CHUNK_LENGTHS))
