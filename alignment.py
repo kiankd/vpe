@@ -524,9 +524,9 @@ def liu_features(ant, trig, sentences, pos_tags, all_dep_names, lemma_list):
             w_lemma = ant_sent.lemmas[i]
             w_dep = ant_sent.dep_label_of_idx(i)
 
-        feature_vec += one_hot_encode(w_pos, pos_tags)
-        feature_vec += one_hot_encode(w_lemma, lemma_list)
-        feature_vec += one_hot_encode(w_dep, all_dep_names)
+        # feature_vec += one_hot_encode(w_pos, pos_tags)
+        # feature_vec += one_hot_encode(w_lemma, lemma_list)
+        # feature_vec += one_hot_encode(w_dep, all_dep_names)
 
     # pair of pos tags / lemmas encoding is too big for MIRA, not doing it right now (last two features in "Labels")
 

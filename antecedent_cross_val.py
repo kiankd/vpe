@@ -28,7 +28,11 @@ seed = 347890
 for arg in argv:
     if arg.startswith('seed='):
         seed = int(arg.split('seed=')[1])
-        break
+    if arg.startswith('c='):
+        C = int(arg.split('c=')[1])
+    if arg.startswith('lr='):
+        LR = int(arg.split('lr=')[1])
+
 
 def init_classifier(auto_parse=True):
     ac = load_classifier(auto_parse=auto_parse, fname=AUTO_PARSE_ALL_ANTS_NPY if auto_parse else GOLD_PARSE_FULL_NPY_DATA)
