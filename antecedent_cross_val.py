@@ -22,6 +22,7 @@ if platform == 'linux2':
 K = 5
 C = 5.0
 LR = 0.01
+dropout = 0.0
 EPOCHS = 2
 seed = 347890
 
@@ -32,6 +33,8 @@ for arg in argv:
         C = float(arg.split('c=')[1])
     if arg.startswith('lr='):
         LR = float(arg.split('lr=')[1])
+    if arg.startswith('drop='):
+        dropout = float(arg.split('lr=')[1])
 
 
 def init_classifier(auto_parse=True):
@@ -75,7 +78,7 @@ def cross_validate(k_fold=5, type_=None, auto_parse=False, classifier=None):
         ac.val_triggers = list(val)
         ac.test_triggers = list(test)
 
-        val_acc, test_acc, val_preds, test_preds = ac.fit(epochs=EPOCHS, k=K)
+        val_acc, test_acc, val_preds, test_preds = ac.fit(epochs=EPOCHS, k=K, dropout=dropout)
         accs.append((val_acc, test_acc))
 
         bval_acc, btest_acc = ac.baseline_prediction()
@@ -137,7 +140,7 @@ def bos_compare():
     ac.val_triggers = temp_val
     ac.test_triggers = temp_test
 
-    val_acc, test_acc = ac.fit(epochs=EPOCHS, k=K)
+    val_acc, test_acc = ac.fit(epochs=EPOCHS, k=K, dropout=dropout)
     bval_acc, btest_acc = ac.baseline_prediction()
 
     print 'MIRA RESULTS:'
@@ -181,7 +184,7 @@ def bos_spen_split():
     # ac.val_triggers = val
     # ac.test_triggers = test
 
-    val_acc, test_acc, val_preds, test_preds = ac.fit(epochs=EPOCHS, k=K)
+    val_acc, test_acc, val_preds, test_preds = ac.fit(epochs=EPOCHS, k=K, dropout=dropout)
     bval_acc, btest_acc = ac.baseline_prediction()
 
     print 'MIRA RESULTS:'

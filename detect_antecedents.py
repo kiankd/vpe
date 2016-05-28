@@ -12,10 +12,10 @@ import sys
 from heapq import nlargest, nsmallest
 from os import listdir
 from pyprind import ProgBar
-from random import randrange,sample
+from random import randrange,sample,random
 from matplotlib import pyplot as plt
 from alignment import alignment_matrix
-from copy import copy
+from copy import copy, deepcopy
 from sklearn.preprocessing import StandardScaler
 from subprocess import call
 call('clear')
@@ -500,7 +500,7 @@ class AntecedentClassifier(object):
                                                                                              min(length_list),
                                                                                              max(length_list))
 
-    def fit(self, epochs=5, verbose=True, k=5, features_to_analyze=5, c_schedule=1.0):
+    def fit(self, epochs=5, verbose=True, k=5, features_to_analyze=5, c_schedule=1.0, dropout=0.0):
         # Here we are just adding the gold standard to the training set.
         for trig in self.train_triggers:
             has = False
@@ -516,7 +516,16 @@ class AntecedentClassifier(object):
         i=0
         for n in range(epochs):
             for trigger in shuffle(self.train_triggers):
-                bestk = self.bestk_ants(trigger, self.W_old, k=k)
+                pre_drop_bestk = self.bestk_ants(trigger, self.W_old, k=k)
+
+                if dropout > 0:
+                    bestk = deepcopy(pre_drop_bestk)
+                    for ant in bestk:
+                        for i in range(len(ant.x)):
+                            if random() <= dropout:
+                                ant.x[i] = 0.0
+                else:
+                    bestk = pre_drop_bestk
 
                 self.W_old = mira.update_weights(self.W_old, bestk, trigger.gold_ant, self.loss_function, C=self.C)
                 self.W_avg = ((1.0 - self.learn_rate(i)) * self.W_avg) + (self.learn_rate(i) * self.W_old)  # Running average.
