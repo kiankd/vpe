@@ -19,6 +19,8 @@ MAX_SCORE = 4.0
 def alignment_matrix(sentences,
                      trigger,
                      word2vec_dict,
+                     all_dep_names,
+                     lemma_list,
                      dep_names = ('prep','adv','dobj','nsubj','nmod'),
                      pos_tags = None,
                      debug = False):
@@ -61,7 +63,8 @@ def alignment_matrix(sentences,
         ant.x = np.array([1] + alignment_vector(mapping, untrigs, unants, dep_names, word2vec_dict, verbose=False)
                              + relational_vector(trigger, ant)
                              + avc.ant_trigger_relationship(ant, trigger, sentences, pos_tags, word2vec_dict)
-                             + hardt_features(ant, trigger, sentences, pos_tags))
+                             + hardt_features(ant, trigger, sentences, pos_tags)
+                             + liu_features(ant, trigger, sentences, pos_tags, all_dep_names, lemma_list))
 
         if debug:
             print 'TOTOAL LENGTH: ',len(ant.x)
@@ -479,3 +482,109 @@ def find_word_sequence(words, targets):
 ADD FEATURE - NUMBER/PROPORTION OF UNMAPPED WORDS
 GET rid of trigger's clause from antecedent chunks
 """
+
+def liu_features(ant, trig, sentences, pos_tags, all_dep_names, lemma_list):
+    """
+    @type ant: vpe_objects.Antecedent
+    @type trig: vpe_objects.Auxiliary
+    @type sentences: vpe_objects.AllSentences
+    """
+    feature_vec = []
+    trig_sent = sentences[trig.sentnum]
+    ant_sent = sentences[ant.sentnum]
+    ant_head_idx = ant.get_head(idx=True)
+
+    # Label features
+    ant_head_pos = ant_sent.pos[ant_head_idx]
+    ant_head_dep = ant_sent.dep_label_of_idx(ant_head_idx)
+    feature_vec += one_hot_encode(ant_head_pos, pos_tags)
+    feature_vec += one_hot_encode(ant_head_dep, all_dep_names)
+
+    if ant.end < len(ant_sent):
+        ant_last_pos = ant_sent.pos[ant.end]
+        ant_last_dep = ant_sent.dep_label_of_idx(ant.end)
+
+        feature_vec += one_hot_encode(ant_last_pos, pos_tags)
+        feature_vec += one_hot_encode(ant_last_dep, all_dep_names)
+    else:
+        feature_vec += one_hot_encode('', pos_tags)
+        feature_vec += one_hot_encode('', all_dep_names)
+
+    # note I assume that "antecedent parent" is previous word in sentence. Because of this, it is unnecessary
+    # parent_pos = ant_sent.pos[ant.start-1] if ant.start-1 < 0 else ''
+    # parent_lemma = ant_sent.lemmas[ant.start-1] if ant.start-1 < 0 else ''
+
+    for i in range(ant.start-3, ant.start)+range(ant.end+1, ant.end+4):
+        if i < 0 or i >= len(ant_sent):
+            w_pos = ''
+            w_lemma = ''
+            w_dep = ''
+        else:
+            w_pos = ant_sent.pos[i]
+            w_lemma = ant_sent.lemmas[i]
+            w_dep = ant_sent.dep_label_of_idx(i)
+
+        feature_vec += one_hot_encode(w_pos, pos_tags)
+        feature_vec += one_hot_encode(w_lemma, lemma_list)
+        feature_vec += one_hot_encode(w_dep, all_dep_names)
+
+    # pair of pos tags / lemmas encoding is too big for MIRA, not doing it right now (last two features in "Labels")
+
+
+    # Tree features
+    # label of dep between ant & target
+    dep_lab = ant_sent.dep_label_between_idxs(ant_head_idx, trig.wordnum) if ant.sentnum == trig.sentnum else ''
+    feature_vec += one_hot_encode(dep_lab, all_dep_names)
+
+    # preps in common
+
+    # Distance features
+    # feature_vec.append(trig.sentnum - ant.sentnum)
+    # need to get number of VPs between trig and ant
+
+    # Match features
+    previous_ant_pos    = [w for w in ant_sent.pos[ant.start-2:ant.start]]
+    previous_ant_lemmas = [w for w in ant_sent.lemmas[ant.start-2:ant.start]]
+    previous_ant_words  = [w for w in ant_sent.words[ant.start-2:ant.start]]
+    if previous_ant_lemmas is []:
+        previous_ant_pos    = [w for w in ant_sent.pos[ant.start-1:ant.start]]
+        previous_ant_lemmas = [w for w in ant_sent.lemmas[ant.start-1:ant.start]]
+        previous_ant_words  = [w for w in ant_sent.words[ant.start-1:ant.start]]
+
+    previous_trig_pos    = [w for w in trig_sent.pos[trig.wordnum-2:trig.wordnum]]
+    previous_trig_lemmas = [w for w in trig_sent.lemmas[trig.wordnum-2:trig.wordnum]]
+    previous_trig_words  = [w for w in trig_sent.words[trig.wordnum-2:trig.wordnum]]
+    if previous_trig_lemmas is []:
+        previous_trig_pos    = [w for w in trig_sent.pos[trig.wordnum-2:trig.wordnum]]
+        previous_trig_lemmas = [w for w in trig_sent.lemmas[trig.wordnum-1:trig.wordnum]]
+        previous_trig_words  = [w for w in trig_sent.words[trig.wordnum-1:trig.wordnum]]
+
+    vec_bool_add(feature_vec, previous_ant_pos == previous_trig_pos)
+    vec_bool_add(feature_vec, previous_ant_lemmas == previous_trig_lemmas)
+    vec_bool_add(feature_vec, previous_ant_words == previous_trig_words)
+
+    # second match rule + more
+    for i in range(1,4):
+        fits = False
+        match_pos = False
+        match_lemma = False
+        match_word = False
+
+        ant_check = ant.start - i
+        trig_check = trig.wordnum - (i-1)
+        if ant_check >= 0 and trig_check >= 0:
+            fits = True
+            match_pos   = ant_sent.pos[ant_check] == trig_sent.pos[trig_check]
+            match_lemma = ant_sent.lemmas[ant_check] == trig_sent.lemmas[trig_check]
+            match_word  = ant_sent.words[ant_check] == trig_sent.words[trig_check]
+
+        for boole in [fits, match_pos, match_lemma, match_word]:
+            vec_bool_add(feature_vec, boole)
+
+    return feature_vec
+
+def one_hot_encode(val, all_vals):
+    return [1.0 if val==v else 0.0 for v in all_vals]
+
+def vec_bool_add(vec, boole):
+    vec.append(1.0 if boole else 0.0)

@@ -9,10 +9,9 @@ from sys import platform, argv
 from random import shuffle
 from load_data import find_section
 
-
 AUTO_PARSE_NPY_DATA      = 'antecedent_auto_parse_data_FULL_DATASET.npy'
 GOLD_PARSE_FULL_NPY_DATA = 'antecedent_GOLD_parse_data_FULL_DATASET.npy'
-AUTO_PARSE_ALL_ANTS_NPY  = 'antecedent_auto_parse_ALL_ANTS.npy'
+AUTO_PARSE_ALL_ANTS_NPY  = 'antecedent_auto_parse_ALL_ANTS_with_liu.npy'
 
 if platform == 'linux2':
     AUTO_PARSE_NPY_DATA      = '../npy_data/' + AUTO_PARSE_NPY_DATA
@@ -23,7 +22,7 @@ if platform == 'linux2':
 K = 5
 C = 5.0
 LR = 0.01
-EPOCHS = 4
+EPOCHS = 2
 seed = 347890
 
 for arg in argv:
@@ -254,6 +253,7 @@ def save_imported_data_for_antecedent(classifier, fname=AUTO_PARSE_NPY_DATA):
             classifier.val_triggers, classifier.test_triggers,
             classifier.sentence_words]
 
+    print 'Saving data...'
     np.save(fname, np.array(data))
 
 def load_imported_data_for_antecedent(fname=AUTO_PARSE_NPY_DATA):
@@ -289,13 +289,13 @@ if __name__ == '__main__':
         # exit(0)
 
         ac = load_imported_data_for_antecedent(fname=save_file)
-        ac.generate_possible_ants2()
         # ac.generate_possible_ants(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb], filter=True)
-        ac.debug_ant_selection()
+        # ac.debug_ant_selection()
+        # save_imported_data_for_antecedent(ac, fname=save_file)
         # exit(0)
         ac.build_feature_vectors()
         ac.normalize()
-        save_imported_data_for_antecedent(ac, fname=save_file[:-4]+'_antgen2.npy')
+        save_imported_data_for_antecedent(ac, fname=save_file)
 
     if 'types' in argv:
         for type_ in [None,'do','be','to','modal','have','so']:

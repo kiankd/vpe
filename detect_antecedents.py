@@ -154,7 +154,7 @@ class AntecedentClassifier(object):
 
                         except IOError:
                             print '(auto-parse file to complete MRG dataset)',
-                            mrg_matrix = vpe.XMLMatrix(f + '.xml', AUTO_PARSE_XML_DIR, pos_file=True)
+                            mrg_matrix = vpe.XMLMatrix(f + '.xml', AUTO_PARSE_XML_DIR, get_deps=True)
                             # NO DEPENDENCIES IN POS FILES!
 
                         """ Note that I am using the gold standard triggers here. """
@@ -325,11 +325,12 @@ class AntecedentClassifier(object):
     def build_feature_vectors(self, verbose=True, test_specific=(None, None), debug=False):
         vec_length = None
         word2vec_dict = truth.loadword2vecs()
-        all_pos_tags = truth.extract_data_from_file(
-            truth.EACH_UNIQUE_POS_FILE)  # We only want to import this file once.
+        all_pos_tags = truth.extract_data_from_file(truth.EACH_UNIQUE_POS_FILE)  # We only want to import this file once.
 
         print 'Building feature vectors...'
 
+        all_dep_names = list(self.sentences.get_all_dependencies()) + [vpe.EMPTY_DEP]
+        lemma_list = self.sentences.get_frequent_lemmas(limit=100)
         dep_names = ('prep','nsubj','dobj','nmod','adv','conj','vmod','amod','csubj')
         print len(dep_names),dep_names
 
@@ -338,7 +339,8 @@ class AntecedentClassifier(object):
             if not (test_specific[0] and test_specific[1]) \
                     or (test_specific[0] == trigger.sentnum and test_specific[1] == trigger.wordnum):
 
-                alignment_matrix(self.sentences, trigger, word2vec_dict, dep_names=dep_names, pos_tags=all_pos_tags, debug=debug)
+                alignment_matrix(self.sentences, trigger, word2vec_dict, all_dep_names, lemma_list,
+                                 dep_names=dep_names, pos_tags=all_pos_tags, debug=debug)
 
                 if trigger == self.train_triggers[0]:
                     vec_length = len(trigger.gold_ant.x)

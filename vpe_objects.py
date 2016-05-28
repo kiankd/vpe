@@ -1,12 +1,13 @@
 import xml.etree.ElementTree as ET
 import nltktree as nt
 import word_characteristics as wc
-from operator import attrgetter
+from operator import attrgetter,itemgetter
 from file_names import Files
 from os import listdir
 from truth import SENTENCE_SEARCH_DISTANCE
 from numpy import dot
 from copy import copy,deepcopy
+from random import shuffle
 
 MODALS = ['can','could','may','must','might','will','would','shall','should']
 BE     = ['be']
@@ -18,6 +19,7 @@ SO     = ['so','same','likewise','opposite']
 AUX_LEMMAS = MODALS+BE+HAVE+DO+TO+SO
 ALL_CATEGORIES = [MODALS, BE, HAVE, DO, TO, SO]
 ALL_AUXILIARIES = Files().extract_data_from_file(Files.UNIQUE_AUXILIARIES_FILE)
+EMPTY_DEP = 'NONE'
 
 """ ---- Exception classes. ---- """
 
@@ -82,6 +84,9 @@ class AllSentences(object):
         return len(self.sentences)
 
     def __getitem__(self, item):
+        """
+        @type return: SentDict
+        """
         return self.get_sentence(item)
 
     def get_all_dependencies(self):
@@ -91,6 +96,19 @@ class AllSentences(object):
                 if not ':' in dep.name:
                     deps.add(dep.name)
         return deps
+
+    def get_frequent_lemmas(self, limit=100):
+        lemmas = {}
+        sents = self.sentences[:]
+        shuffle(sents)
+        for sent in sents[:200]:
+            for lemma in sent.lemmas:
+                if lemma in lemmas:
+                    lemmas[lemma] += 1
+                else:
+                    lemmas[lemma] = 1
+        sorted_ = [t[1] for t in reversed(sorted(lemmas.items(), key=itemgetter(1)))]
+        return sorted_[:limit]
 
     def add_mrg(self, mrg_matrix):
         for sentdict in mrg_matrix:
@@ -705,6 +723,33 @@ class SentDict(object):
                                                                    self.lemmas[i - 1:i], start=i - 1, end=i)})
 
         return chunks
+
+    def dep_label_of_idx(self, idx):
+        assert 0 <= idx <= len(self)
+        dependent = None
+        try:
+            for dep in self.dependencies:
+                if dep.gov == idx:
+                    return dep.name
+                if dep.dependent == idx:
+                    dependent = dep.name
+            if dependent is not None:
+                return dependent
+        except AttributeError:
+            print 'Sentdict has no dependencies! (WHYYYY?!?!)'
+
+        return EMPTY_DEP
+
+    def dep_label_between_idxs(self, i, j):
+        assert 0 <= i <= len(self) and 0 <= j <= len(self)
+        try:
+            for dep in self.dependencies:
+                if (i,j) == (dep.gov, dep.dependent) or (j,i) == (dep.gov, dep.dependent):
+                    return dep.name
+        except AttributeError:
+            print 'Sentdict has no dependencies! (WHYYYY?!?!)'
+
+        return ''
 
 def chunks_to_string(chunk):
     s = ''
