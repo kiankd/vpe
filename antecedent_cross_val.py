@@ -29,9 +29,9 @@ for arg in argv:
     if arg.startswith('seed='):
         seed = int(arg.split('seed=')[1])
     if arg.startswith('c='):
-        C = int(arg.split('c=')[1])
+        C = float(arg.split('c=')[1])
     if arg.startswith('lr='):
-        LR = int(arg.split('lr=')[1])
+        LR = float(arg.split('lr=')[1])
 
 
 def init_classifier(auto_parse=True):
