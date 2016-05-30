@@ -159,13 +159,20 @@ def bos_spen_split():
     if 'hardt' in argv:
         ac = set_classifier_features_to_hardt(ac)
         ac.initialize_weights(seed=seed)
+
     if 'only_liu' in argv:
         for ant in ac.iterants():
             ant.x = ant.x[404:]
         ac.initialize_weights(seed=seed)
+
     if 'no_liu' in argv:
         for ant in ac.iterants():
             ant.x = ant.x[:404]
+        ac.initialize_weights(seed=seed)
+
+    if 'some_liu' in argv:
+        for ant in ac.iterants():
+            ant.x = ant.x[range(404) + range(len(ant.x)-15, len(ant.x))]
         ac.initialize_weights(seed=seed)
 
     ac.debug_ant_selection()
