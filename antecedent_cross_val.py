@@ -162,6 +162,7 @@ def bos_spen_split():
         for trig in ac.itertrigs():
             for ant in [trig.gold_ant] + trig.possible_ants:
                 ant.x = ant.x[404:]
+        ac.initialize_weights(seed=seed)
 
     ac.debug_ant_selection()
 
