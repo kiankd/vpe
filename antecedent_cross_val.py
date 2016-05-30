@@ -201,6 +201,10 @@ def ablation_study(auto_parse=False, exclude=True):
     for tup in feat_dict.iterkeys():
         ac = load_classifier(auto_parse=auto_parse, fname=AUTO_PARSE_ALL_ANTS_NPY)
 
+        for ant in ac.iterants():
+            ant.x = ant.x[range(404) + range(len(ant.x)-15, len(ant.x))]
+        ac.initialize_weights(seed=seed)
+
         print 'Current excluded feature:',feat_dict[tup]
         print 'Using tuple: ',tup
         for trig in ac.itertrigs():
@@ -221,7 +225,7 @@ def ablation_study(auto_parse=False, exclude=True):
 
         results = ['----\nFeature: %s\n' % feat_dict[tup]] + ['EXCLUDED' if exclude else 'INLCUDED', '\n'] \
                   + cross_validate(auto_parse=auto_parse, classifier=ac)
-        log_results(results, fname='feature_ablation_ant_LIUfeatures_%s.txt'%('EXCLUDED' if exclude else 'INCLUDED'))
+        log_results(results, fname='feature_ablation_ant_LIU_features_%s.txt'%('EXCLUDED' if exclude else 'INCLUDED'))
 
 def log_results(results_lst, fname='ANT_CROSS_VALIDATION_RESULTS.txt'):
     with open(fname, 'a') as f:
