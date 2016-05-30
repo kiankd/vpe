@@ -47,17 +47,14 @@ def init_classifier(auto_parse=True):
     ac.learn_rate = lambda x: LR
     return ac
 
-def cross_validate(k_fold=5, type_=None, auto_parse=False, classifier=None):
+def cross_validate(k_fold=5, type_=None, auto_parse=False, classifier=None, shrink=True):
     if classifier is not None:
         ac = classifier
     else:
         ac = load_classifier(auto_parse=auto_parse, fname=AUTO_PARSE_ALL_ANTS_NPY)
-
-    ac.initialize_weights()
-
-    if 'some_liu' in argv:
-        for ant in ac.iterants():
-            ant.x = ant.x[range(404) + range(len(ant.x)-15, len(ant.x))]
+        if 'some_liu' in argv:
+            for ant in ac.iterants():
+                ant.x = ant.x[range(404) + range(len(ant.x)-15, len(ant.x))]
         ac.initialize_weights(seed=seed)
 
     ac.C = C
