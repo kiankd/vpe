@@ -210,7 +210,8 @@ def ablation_study(auto_parse=False, exclude=True):
     # next exclude relational features
     # next exclude ant_trig relation features
     # last exclude hardt/nielsen feats
-    feat_dict = {(139,419):'alignment',
+    feat_dict = {(1,419):'NO FEATURES EXCLUDED',
+                 (139,419):'alignment',
                  (1,143,201,419):'ant_trig',
                  (1,201,404,419):'hardt',
                  (1,404):'liu'}
@@ -242,7 +243,7 @@ def ablation_study(auto_parse=False, exclude=True):
 
         results = ['----\nFeature: %s\n' % feat_dict[tup]] + ['EXCLUDED' if exclude else 'INLCUDED', '\n'] \
                   + cross_validate(auto_parse=auto_parse, classifier=ac)
-        log_results(results, fname='feature_ablation_ant_LIU_features_%s.txt'%('EXCLUDED' if exclude else 'INCLUDED'))
+        log_results(results, fname='feature_ablation_ant_LIU_features_c%s_lr%s.txt'%(str(C), str(LR)))
 
 def log_results(results_lst, fname='ANT_CROSS_VALIDATION_RESULTS.txt'):
     with open(fname, 'a') as f:
