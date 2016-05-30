@@ -55,6 +55,11 @@ def cross_validate(k_fold=5, type_=None, auto_parse=False, classifier=None):
 
     ac.initialize_weights()
 
+    if 'some_liu' in argv:
+        for ant in ac.iterants():
+            ant.x = ant.x[range(404) + range(len(ant.x)-15, len(ant.x))]
+        ac.initialize_weights(seed=seed)
+
     ac.C = C
     ac.learn_rate = lambda x: LR
 
