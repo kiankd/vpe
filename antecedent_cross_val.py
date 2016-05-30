@@ -218,7 +218,6 @@ def ablation_study(auto_parse=False, exclude=True):
 
         for ant in ac.iterants():
             ant.x = ant.x[range(404) + range(len(ant.x)-15, len(ant.x))]
-        ac.initialize_weights(seed=seed)
 
         print 'Current excluded feature:',feat_dict[tup]
         print 'Using tuple: ',tup
@@ -237,6 +236,8 @@ def ablation_study(auto_parse=False, exclude=True):
                         ant.x = l[tup[1]:tup[2]]
 
                 ant.x = np.array([1] + ant.x)
+
+        ac.initialize_weights(seed=seed)
 
         results = ['----\nFeature: %s\n' % feat_dict[tup]] + ['EXCLUDED' if exclude else 'INLCUDED', '\n'] \
                   + cross_validate(auto_parse=auto_parse, classifier=ac)
