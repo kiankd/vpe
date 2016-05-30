@@ -23,7 +23,7 @@ K = 5
 C = 5.0
 LR = 0.01
 dropout = 0.0
-EPOCHS = 2
+EPOCHS = 5
 seed = 347890
 
 for arg in argv:
@@ -34,7 +34,9 @@ for arg in argv:
     if arg.startswith('lr='):
         LR = float(arg.split('lr=')[1])
     if arg.startswith('drop='):
-        dropout = float(arg.split('lr=')[1])
+        dropout = float(arg.split('drop=')[1])
+    if arg.startswith('epochs='):
+        EPOCHS = int(arg.split('epochs=')[1])
 
 
 def init_classifier(auto_parse=True):
@@ -156,6 +158,10 @@ def bos_spen_split():
     if 'hardt' in argv:
         ac = set_classifier_features_to_hardt(ac)
         ac.initialize_weights(seed=seed)
+    if 'only_liu' in argv:
+        for trig in ac.itertrigs():
+            for ant in [trig.gold_ant] + trig.possible_ants:
+                ant.x = ant.x[404:]
 
     ac.debug_ant_selection()
 
