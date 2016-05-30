@@ -13,16 +13,16 @@ def int_to_bool(inte):
 def get_all_features(old_rules=True):
     if old_rules: rules = 'old_rules'
     else: rules = 'my_rules'
-    return ['words','pos','bigrams','my_features',rules,'square_rules','combine_aux_type']
+    return ['aux','words','pos','bigrams','my_features',rules,'square_rules','combine_aux_type']
 
 def make_vector(sentdict, aux, features, aux_categories, aux_lemmas, aux_words, surrounding_words, pos_tags, pos_bigrams, make_old=False):
 
     vec = []
     if not make_old:
-        vec += lemma_category_vector(aux, aux_categories)
-        vec += lemma_vector(aux, aux_lemmas)
-        vec += aux_vector(aux, aux_words)
-
+        if 'aux' in features:
+            vec += lemma_category_vector(aux, aux_categories)
+            vec += lemma_vector(aux, aux_lemmas)
+            vec += aux_vector(aux, aux_words)
         if 'words' in features:
             vec += aux_structure_vector(sentdict, aux, 'words', surrounding_words)
         if 'pos' in features:

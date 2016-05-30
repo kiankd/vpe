@@ -177,31 +177,6 @@ def bos_spen_split():
 
     ac.debug_ant_selection()
 
-    # train_secs = range(0,15)
-    # val_secs = range(15,20)
-    # test_secs = range(20,25)
-    # section_ends = {0: 964, 1: 1538, 2: 2461, 3: 2966, 4: 3661, 5: 4402, 6: 4843, 7: 5721, 8: 6137, 9: 6915, 10: 7606,
-    #                 11: 8251, 12: 8851, 13: 9621, 14: 10348, 15: 11206, 16: 12337, 17: 12906, 18: 13510, 19: 14152,
-    #                 20: 14704, 21: 15416, 22: 16419, 23: 17112, 24: 17925}
-    #
-    # train, val, test = [], [], []
-    #
-    # for trig in ac.itertrigs():
-    #     section = find_section(trig.sentnum, section_ends)
-    #
-    #     if section in train_secs:
-    #         train.append(trig)
-    #
-    #     if section in val_secs:
-    #         val.append(trig)
-    #
-    #     if section in test_secs:
-    #         test.append(trig)
-    #
-    # ac.train_triggers = train
-    # ac.val_triggers = val
-    # ac.test_triggers = test
-
     val_acc, test_acc, val_preds, test_preds = ac.fit(epochs=EPOCHS, k=K, dropout=dropout)
     bval_acc, btest_acc = ac.baseline_prediction()
 
@@ -218,10 +193,10 @@ def ablation_study(auto_parse=False, exclude=True):
     # next exclude relational features
     # next exclude ant_trig relation features
     # last exclude hardt/nielsen feats
-    feat_dict = {(139,404):'alignment',
-                 (1,139,143,404):'relational',
-                 (1,143,201,404):'ant_trig',
-                 (1,201):'hardt'}
+    feat_dict = {(139,419):'alignment',
+                 (1,143,201,419):'ant_trig',
+                 (1,201,404,419):'hardt',
+                 (1,404):'liu'}
 
     for tup in feat_dict.iterkeys():
         ac = load_classifier(auto_parse=auto_parse, fname=AUTO_PARSE_ALL_ANTS_NPY)

@@ -341,7 +341,8 @@ def analyze_results(y_true, y_pred, sentences, auxs):
 def run_feature_ablation(loaded_data, exclude=True):
     # Features: ['words','pos','bigrams','my_features','old_rules','square_rules','combine_aux_type']
     all_features = vc.get_all_features()
-    features = [['words'],
+    features = [['aux'],
+                ['words'],
                 ['pos'],
                 ['bigrams'],
                 ['my_features'],
