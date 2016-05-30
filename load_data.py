@@ -338,33 +338,21 @@ def analyze_results(y_true, y_pred, sentences, auxs):
             print aux
             print
 
-def run_feature_ablation(loaded_data, exclude=True):
-    # Features: ['words','pos','bigrams','my_features','old_rules','square_rules','combine_aux_type']
-    all_features = vc.get_all_features()
+def run_feature_ablation(loaded_data):
+    # Features: ['aux','words','pos','bigrams','my_features','old_rules','square_rules','combine_aux_type']
     features = [['aux'],
-                ['words'],
-                ['pos'],
-                ['bigrams'],
-                ['my_features'],
-                ['old_rules'],
-                ['old_rules','square_rules'],
-                ['combine_aux_type']]
-    newf = []
-    for i in range(len(features)):
-        for j in range(i+1, len(features)):
-            newf.append(features[i] + features[j])
+                ['words','pos','bigrams'],
+                ['old_rules','my_features','square_rules']]
 
-    newf.remove(['old_rules','old_rules','square_rules'])
     for ablated in features:
-        if exclude:
-            print 'Feature EXCLUDED: ',ablated
-            ablation_features = [f for f in all_features if f not in ablated]
-        else:
-            print 'Only feature included: ',ablated
-            # ablation_features = [f for f in features if f!=ablated]
-            ablation_features = ablated
-
-        loaded_data.set_all_auxs(ablation_features, reset=True)
+        excluded = [l for l in features if l!=ablated]
+        temp = []
+        for l in excluded:
+            for val in l:
+                temp.append(val)
+        excluded = temp
+        print 'Using the following features:',excluded
+        loaded_data.set_all_auxs(excluded, reset=True)
         loaded_data.run_cross_validation(loaded_data.X, loaded_data.Y, LogisticRegressionCV(),
                                          oversample=5, check_fp=False, rand=1489987)
         print '------------------------------------------'

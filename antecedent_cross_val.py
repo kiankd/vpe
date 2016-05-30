@@ -187,6 +187,19 @@ def bos_spen_split():
 
     return
 
+def prediction_results(proposed, actual):
+    # calculating liu et al. antecedent head resolution:
+    assert len(proposed) == len(actual)
+    tp, fp, fn = 0, 0, 0
+    for i in range(len(proposed)):
+        proposed_head = proposed[i].get_head()
+
+        if proposed_head in actual[i].words:
+            tp += 1
+
+
+
+
 def ablation_study(auto_parse=False, exclude=True):
     # This is the division of features by their class:
     # first excludes the alignment features,
