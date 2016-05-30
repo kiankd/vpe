@@ -297,7 +297,7 @@ def load_imported_data_for_antecedent(fname=AUTO_PARSE_NPY_DATA):
 if __name__ == '__main__':
     mrg = 'mrg' in argv
     save_file = GOLD_PARSE_FULL_NPY_DATA if mrg else AUTO_PARSE_ALL_ANTS_NPY
-    results_save = 'final_results_ALL_TYPES_ALL_ANTS_WITH_LIU.txt'
+    results_save = 'final_results_ALL_TYPES_ALL_ANTS_WITH_LIU_c%s_lr%s.txt' %(str(C), str(LR))
 
     if 'gen2' in argv:
         AUTO_PARSE_ALL_ANTS_NPY = AUTO_PARSE_ALL_ANTS_NPY[:-4]+'_antgen2.npy'
