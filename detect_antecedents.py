@@ -359,6 +359,11 @@ class AntecedentClassifier(object):
         for trig in self.train_triggers + self.val_triggers + self.test_triggers:
             yield trig
 
+    def iterants(self):
+        for trig in self.itertrigs():
+            for ant in trig.possible_ants + [trig.gold_ant]:
+                yield ant
+
     def initialize_weights(self, initial=None, seed=1917):
         np.random.seed(seed)
         # self.W_old = np.ones(len(self.train_triggers[0].possible_ants[0].x))
