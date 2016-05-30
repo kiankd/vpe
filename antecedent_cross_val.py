@@ -196,9 +196,8 @@ def prediction_results(proposed, actual):
 
         if proposed_head in actual[i].words:
             tp += 1
-
-
-
+        else:
+            fp += 1
 
 def ablation_study(auto_parse=False, exclude=True):
     # This is the division of features by their class:
@@ -293,7 +292,7 @@ def load_imported_data_for_antecedent(fname=AUTO_PARSE_NPY_DATA):
 if __name__ == '__main__':
     mrg = 'mrg' in argv
     save_file = GOLD_PARSE_FULL_NPY_DATA if mrg else AUTO_PARSE_ALL_ANTS_NPY
-    results_save = 'final_results_ALL_TYPES_ALL_ANTS.txt'
+    results_save = 'final_results_ALL_TYPES_ALL_ANTS_WITH_LIU.txt'
 
     if 'gen2' in argv:
         AUTO_PARSE_ALL_ANTS_NPY = AUTO_PARSE_ALL_ANTS_NPY[:-4]+'_antgen2.npy'

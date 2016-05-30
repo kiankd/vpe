@@ -191,9 +191,9 @@ class Dataset(object):
             else:
                 print '\nTesting sets - BASELINE CV results for %s:'%model_name
 
-            print 'Precision: %0.2f'%np.mean([t[0] for t in lst])
-            print 'Recall: %0.2f'%np.mean([t[1] for t in lst])
-            print 'F1: %0.2f'%np.mean([t[2] for t in lst])
+            print 'Precision: %0.4f'%np.mean([t[0] for t in lst])
+            print 'Recall: %0.4f'%np.mean([t[1] for t in lst])
+            print 'F1: %0.4f'%np.mean([t[2] for t in lst])
 
     @staticmethod
     def oversample(x, y, multiplier=5):
@@ -344,6 +344,12 @@ def run_feature_ablation(loaded_data):
                 ['words','pos','bigrams'],
                 ['old_rules','my_features','square_rules']]
 
+    print 'Results when using all features:'
+    loaded_data.run_cross_validation(loaded_data.X, loaded_data.Y, LogisticRegressionCV(),
+                                         oversample=5, check_fp=False, rand=1489987)
+
+    print '---\nABLATION:'
+
     for ablated in features:
         excluded = [l for l in features if l!=ablated]
         temp = []
@@ -461,7 +467,6 @@ def bos_train_test_split():
     print 'Results acquired from using our algorithm on the bos train-test split:'
     print accuracy_results(test_Y, predictions)
 
-
 def find_section(sentnum, section_dict):
     for sec in sorted(section_dict.iterkeys()):
         if sentnum < section_dict[sec]:
@@ -477,7 +482,7 @@ if __name__ == '__main__':
 
     if 'load' in argv:
         data = Dataset.load_dataset(mrg_data=mrg)
-        for type_ in ['all','so','do','to','modal','have','be']:
+        for type_ in ['do','be','modal','so','have','to']:
             type_x, type_y = data.get_auxs_by_type(type_)
             for model in [LogisticRegressionCV()]:#[LogisticRegression(), LogisticRegressionCV(), SVC(), LinearSVC()]:
                 print type_
