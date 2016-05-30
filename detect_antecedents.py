@@ -595,8 +595,8 @@ class AntecedentClassifier(object):
         val_preds = self.predict(self.val_triggers)
         test_preds = self.predict(self.test_triggers)
 
-        print 'Validation head match using best weight vector: %0.4f'%self.criteria_based_results(val_preds)[1]
-        print 'Test head match using best validation weight vector: %0.4f'%self.criteria_based_results(test_preds)[1]
+        print 'Validation em/hm/ho using best weight vector:',self.criteria_based_results(val_preds)
+        print 'Test em/hm/ho using best weight vector:',self.criteria_based_results(test_preds)
         print 'Test Bos & Spen ERROR using best validation weight vector: %0.4f'%self.accuracy(test_preds)
 
         # returns head match

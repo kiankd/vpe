@@ -8,6 +8,7 @@ from sklearn.cross_validation import KFold
 from sys import platform, argv
 from random import shuffle
 from load_data import find_section
+from sklearn.linear_model import LogisticRegressionCV
 
 AUTO_PARSE_NPY_DATA      = 'antecedent_auto_parse_data_FULL_DATASET.npy'
 GOLD_PARSE_FULL_NPY_DATA = 'antecedent_GOLD_parse_data_FULL_DATASET.npy'
