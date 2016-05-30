@@ -221,7 +221,7 @@ def ablation_study(auto_parse=False, exclude=True):
 
         results = ['----\nFeature: %s\n' % feat_dict[tup]] + ['EXCLUDED' if exclude else 'INLCUDED', '\n'] \
                   + cross_validate(auto_parse=auto_parse, classifier=ac)
-        log_results(results, fname='feature_ablation_ant_laxloss_%s.txt'%('EXCLUDED' if exclude else 'INCLUDED'))
+        log_results(results, fname='feature_ablation_ant_LIUfeatures_%s.txt'%('EXCLUDED' if exclude else 'INCLUDED'))
 
 def log_results(results_lst, fname='ANT_CROSS_VALIDATION_RESULTS.txt'):
     with open(fname, 'a') as f:
