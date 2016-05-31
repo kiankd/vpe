@@ -198,7 +198,7 @@ def prediction_results(proposed, actual):
     for i in range(len(proposed)):
         proposed_head = proposed[i].get_head()
 
-        if proposed_head in actual[i].words:
+        if proposed_head in actual[i].sub_sentdict.words:
             tp += 1
         else:
             fp += 1
