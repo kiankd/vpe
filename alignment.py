@@ -87,7 +87,7 @@ def alignment_matrix(sentences,
 
 def hardt_features(ant, trig, sentences, pos_tags):
     """
-        This exists to add features that are based on what Hardt did in 1997.
+    This exists to add features that are somewhat based on what Hardt did in 1997.
         @type ant: vpe_objects.Antecedent
         @type trig: vpe_objects.Auxiliary
         @type sentences: vpe_objects.AllSentences

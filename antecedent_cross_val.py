@@ -47,7 +47,7 @@ def init_classifier(auto_parse=True):
     ac.learn_rate = lambda x: LR
     return ac
 
-def cross_validate(k_fold=5, type_=None, auto_parse=False, classifier=None, shrink=True):
+def cross_validate(k_fold=5, type_=None, auto_parse=False, classifier=None):
     if classifier is not None:
         ac = classifier
     else:
@@ -187,6 +187,8 @@ def bos_spen_split():
     print '\nBASELINE:'
     print bval_acc, btest_acc
 
+    prediction_results(test_preds, [trig.gold_ant for trig in ac.test_triggers])
+
     return
 
 def prediction_results(proposed, actual):
@@ -200,6 +202,8 @@ def prediction_results(proposed, actual):
             tp += 1
         else:
             fp += 1
+
+    print '\nLiu precision', float(tp)/(tp+fp)
 
 def ablation_study(auto_parse=False, exclude=True):
     # This is the division of features by their class:
