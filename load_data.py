@@ -131,6 +131,10 @@ class Dataset(object):
         test_results = []
         baseline_results = []
 
+        test_actuals = []
+        test_preds = []
+        test_trig_idxs = []
+
         kf = KFold(len(X), n_folds=k_fold, shuffle=True, random_state=rand)
 
         assert len(X) == len(Y)
@@ -169,6 +173,10 @@ class Dataset(object):
             train_pred = model.predict(X_train)
             test_pred = model.predict(X_test)
 
+            test_actuals.append(Y_test)
+            test_preds.append(test_pred)
+            test_trig_idxs.append(test_idx)
+
             # Results.
             train_results.append(accuracy_results(Y_train, train_pred))
             test_results.append(accuracy_results(Y_test, test_pred))
@@ -194,6 +202,8 @@ class Dataset(object):
             print 'Precision: %0.4f'%np.mean([t[0] for t in lst])
             print 'Recall: %0.4f'%np.mean([t[1] for t in lst])
             print 'F1: %0.4f'%np.mean([t[2] for t in lst])
+
+        return test_trig_idxs, test_preds, test_actuals
 
     @staticmethod
     def oversample(x, y, multiplier=5):
@@ -472,6 +482,34 @@ def find_section(sentnum, section_dict):
         if sentnum < section_dict[sec]:
             return sec
 
+def results_by_type(all_triggers, trig_idx_lst, pred_cv, actual_cv):
+    results_dict = {}
+    all_triggers = np.array(all_triggers)
+
+    for index in range(len(pred_cv)):
+        trigs = all_triggers[trig_idx_lst[index]]
+        preds = pred_cv[index]
+        actual = actual_cv[index]
+
+        type_dict = {}
+        for type_ in ['do','be','to','modal','have','so']:
+            type_dict[type_] = ([],[])
+
+            if not type_ in results_dict:
+                results_dict[type_] = []
+
+        for i,trig in enumerate(trigs):
+            type_dict[trig.type][0].append(preds[i])
+            type_dict[trig.type][1].append(actual[i])
+
+        for type_ in type_dict:
+            results_dict[type_].append(accuracy_results(type_dict[1], type_dict[0])[-1])
+
+    for type_ in results_dict:
+        avg_f1 = np.mean(results_dict[type_])
+        print type_,'gets this F1-accuracy:',avg_f1,'\n'
+
+
 if __name__ == '__main__':
     mrg = 'mrg' in argv
 
@@ -482,12 +520,8 @@ if __name__ == '__main__':
 
     if 'load' in argv:
         data = Dataset.load_dataset(mrg_data=mrg)
-        for type_ in ['do','be','modal','so','have','to']:
-            type_x, type_y = data.get_auxs_by_type(type_)
-            for model in [LogisticRegressionCV()]:#[LogisticRegression(), LogisticRegressionCV(), SVC(), LinearSVC()]:
-                print type_
-                data.run_cross_validation(type_x, type_y, model, oversample=5, check_fp=False, rand=1489987, aux_type=type_)
-                print '------------------------------------------'
+        trig_idxs,preds,actuals = data.run_cross_validation(data.X, data.Y, LogisticRegressionCV(), oversample=5, check_fp=False, rand=1489987, aux_type=None)
+        results_by_type(data.auxs, trig_idxs, preds, actuals)
 
     if 'ablate' in argv:
         data = Dataset.load_dataset(mrg_data=mrg) #MRG OR NO?
