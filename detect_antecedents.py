@@ -71,6 +71,7 @@ class AntecedentClassifier(object):
 
         self.section_ends = {x:None for x in range(0, 25)}
         self.sentence_words = []
+        self.use_auto_triggers = False
 
     def reset(self):
         self.W_avg = None
@@ -543,7 +544,7 @@ class AntecedentClassifier(object):
                 # if verbose and n>0:
                 train_preds = self.predict(self.train_triggers)
                 val_preds = self.predict(self.val_triggers)
-                test_preds = self.predict(self.test_triggers)
+                test_preds = self.predict(self.test_triggers, test=True)
 
                 self.train_err.append(self.accuracy(train_preds))
                 self.val_err.append(self.accuracy(val_preds))
@@ -605,10 +606,13 @@ class AntecedentClassifier(object):
         # returns bos & spen acc (accuracy function is actually error)
         return 1.0-self.accuracy(val_preds), 1.0-self.accuracy(test_preds), val_preds, test_preds
 
-    def predict(self, trigger_list):
+    def predict(self, trigger_list, test=False):
         predictions = []
         for trigger in trigger_list:
-            predictions.append(self.bestk_ants(trigger, self.W_avg, k=1)[0])
+            if test and self.use_auto_triggers and not trigger.was_automatically_detected:
+                predictions.append(vpe.EmptyAntecedent(trigger))
+            else:
+                predictions.append(self.bestk_ants(trigger, self.W_avg, k=1)[0])
         return predictions
 
     def loss_function(self, gold_ant, proposed_ant):
@@ -619,9 +623,6 @@ class AntecedentClassifier(object):
         # I think this should be slightly modified:
         # weigh the "head" - the first word of the gold_ant
         # more than the rest of the words.
-
-        if not gold_ant.get_head() in proposed_ant.get_words():
-            return 1.0
 
         gold_vals = gold_ant.get_words()
         proposed_vals = proposed_ant.get_words()
@@ -880,7 +881,7 @@ class AntecedentClassifier(object):
         # return head match % for validation and test results
         #return self.criteria_based_results(val_ant_pred)[1], self.criteria_based_results(test_ant_pred)[1]
         # return bos & spen acc
-        return 1.0-self.accuracy(val_ant_pred), 1.0-self.accuracy(test_ant_pred)
+        return 1.0-self.accuracy(val_ant_pred), 1.0-self.accuracy(test_ant_pred), val_ant_pred, test_ant_pred
 
     def gold_analysis(self):
         print 'Triggers:',

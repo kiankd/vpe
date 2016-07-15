@@ -20,7 +20,7 @@ from scipy.sparse import csr_matrix, vstack
 
 files = Files()
 MRG_DATA_FILE = 'dataset_with_features_ALL_AUXS.npy'
-AUTO_PARSE_FILE = 'auto_parse_with_features_FULL_DATASET.npy'
+AUTO_PARSE_FILE = '../npy_data/auto_parse_with_features_FULL_DATASET.npy'
 AUTO_PARSE_XML_DIR = '/Users/kian/Documents/HONOR/xml_annotations/raw_auto_parse/'
 
 class Dataset(object):
@@ -152,6 +152,7 @@ class Dataset(object):
             if oversample > 1:
                 X_train, Y_train = Dataset.oversample(X_train, Y_train, multiplier=oversample)
 
+            if verbose: print 'CSR stacking...'
             X_train = vstack_csr_vecs(X_train)
             X_test = vstack_csr_vecs(X_test)
             test_auxs = np.array(self.get_aux_list_by_type(aux_type))[test_idx]
@@ -477,13 +478,23 @@ def bos_train_test_split():
     print 'Results acquired from using our algorithm on the bos train-test split:'
     print accuracy_results(test_Y, predictions)
 
+    save_end_to_end(test_Y, predictions)
+
+def save_end_to_end(gold, predicted):
+    assert len(gold) == len(predicted)
+    predictions_on_gold = []
+    for i,gold_val in enumerate(gold):
+        if gold_val == 1:
+            predictions_on_gold.append(predicted[i])
+    np.save('END_TO_END_PREDICTIONS.npy', np.array([predictions_on_gold]))
+
 def find_section(sentnum, section_dict):
     for sec in sorted(section_dict.iterkeys()):
         if sentnum < section_dict[sec]:
             return sec
 
 def results_by_type(all_triggers, trig_idx_lst, pred_cv, actual_cv):
-    results_dict = {}
+    type_dict = {key:[[],[]] for key in ['do','be','to','modal','have','so']}
     all_triggers = np.array(all_triggers)
 
     for index in range(len(pred_cv)):
@@ -491,23 +502,12 @@ def results_by_type(all_triggers, trig_idx_lst, pred_cv, actual_cv):
         preds = pred_cv[index]
         actual = actual_cv[index]
 
-        type_dict = {}
-        for type_ in ['do','be','to','modal','have','so']:
-            type_dict[type_] = ([],[])
-
-            if not type_ in results_dict:
-                results_dict[type_] = []
-
         for i,trig in enumerate(trigs):
             type_dict[trig.type][0].append(preds[i])
             type_dict[trig.type][1].append(actual[i])
 
-        for type_ in type_dict:
-            results_dict[type_].append(accuracy_results(type_dict[1], type_dict[0])[-1])
-
-    for type_ in results_dict:
-        avg_f1 = np.mean(results_dict[type_])
-        print type_,'gets this F1-accuracy:',avg_f1,'\n'
+    for type_ in type_dict:
+        print type_,'gets this F1-accuracy:',accuracy_results(type_dict[type_][1], type_dict[type_][0]),'\n'
 
 
 if __name__ == '__main__':
@@ -520,7 +520,7 @@ if __name__ == '__main__':
 
     if 'load' in argv:
         data = Dataset.load_dataset(mrg_data=mrg)
-        trig_idxs,preds,actuals = data.run_cross_validation(data.X, data.Y, LogisticRegressionCV(), oversample=5, check_fp=False, rand=1489987, aux_type=None)
+        trig_idxs,preds,actuals = data.run_cross_validation(data.X, data.Y, LogisticRegressionCV(), verbose=True, oversample=5, check_fp=False, rand=1489987, aux_type='all')
         results_by_type(data.auxs, trig_idxs, preds, actuals)
 
     if 'ablate' in argv:

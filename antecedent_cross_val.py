@@ -13,6 +13,7 @@ from sklearn.linear_model import LogisticRegressionCV
 AUTO_PARSE_NPY_DATA      = 'antecedent_auto_parse_data_FULL_DATASET.npy'
 GOLD_PARSE_FULL_NPY_DATA = 'antecedent_GOLD_parse_data_FULL_DATASET.npy'
 AUTO_PARSE_ALL_ANTS_NPY  = 'antecedent_auto_parse_ALL_ANTS_with_liu.npy'
+END_TO_END = 'END_TO_END_PREDICTIONS.npy'
 
 if platform == 'linux2':
     AUTO_PARSE_NPY_DATA      = '../npy_data/' + AUTO_PARSE_NPY_DATA
@@ -47,7 +48,16 @@ def init_classifier(auto_parse=True):
     ac.learn_rate = lambda x: LR
     return ac
 
-def cross_validate(k_fold=5, type_=None, auto_parse=False, classifier=None):
+def add_end_to_end(classifier):
+    predictions_on_gold = np.load(END_TO_END)[0]
+    assert len(classifier.test_triggers) == len(predictions_on_gold)
+    for i,val in enumerate(predictions_on_gold):
+        if val == 1:
+            classifier.test_triggers[i].was_automatically_detected = True
+
+def cross_validate(k_fold=5, type_=None, auto_parse=False, classifier=None, baseline=False, get_res_str=False):
+    prediction_cv_list = []
+
     if classifier is not None:
         ac = classifier
     else:
@@ -56,6 +66,11 @@ def cross_validate(k_fold=5, type_=None, auto_parse=False, classifier=None):
             for ant in ac.iterants():
                 ant.x = ant.x[range(404) + range(len(ant.x)-15, len(ant.x))]
         ac.initialize_weights(seed=seed)
+
+    if 'debug2' in argv:
+        ac.train_triggers = ac.train_triggers[:5]
+        ac.val_triggers = ac.val_triggers[:5]
+        ac.test_triggers = ac.test_triggers[:5]
 
     ac.C = C
     ac.learn_rate = lambda x: LR
@@ -83,31 +98,55 @@ def cross_validate(k_fold=5, type_=None, auto_parse=False, classifier=None):
         ac.val_triggers = list(val)
         ac.test_triggers = list(test)
 
-        val_acc, test_acc, val_preds, test_preds = ac.fit(epochs=EPOCHS, k=K, dropout=dropout)
-        accs.append((val_acc, test_acc))
+        if not baseline:
+            val_acc, test_acc, val_preds, test_preds = ac.fit(epochs=EPOCHS, k=K, dropout=dropout)
+            accs.append((val_acc, test_acc))
+            prediction_cv_list.append(test_preds)
+        else:
+            bval_acc, btest_acc, bval_pred, btest_pred = ac.baseline_prediction()
+            baseline_accs.append((bval_acc, btest_acc))
+            prediction_cv_list.append(btest_pred)
 
-        bval_acc, btest_acc = ac.baseline_prediction()
-        baseline_accs.append((bval_acc, btest_acc))
         ac.reset()
         ac.initialize_weights()
 
     results = []
-    for lst in (baseline_accs, accs):
-        end = '\n'
-        s = ''
-        if type_:
-            s+= 'TRIGGER TYPE: ' + type_ + end
-        s += 'MIRA RESULTS' if lst == accs else 'BASLINE RESULTS'
-        s += end
-        s += 'Average val accuracy: ' + str(np.mean([t[0] for t in lst])) + end
-        s += 'Average test accuracy: ' + str(np.mean([t[1] for t in lst])) + end
-        for tup in lst:
-            s += '\t' + str(tup) + end
-        s += end
-        results.append(s)
-        print s
+    lst = baseline_accs if baseline else accs
+    end = '\n'
+    s = ''
+    if type_:
+        s+= 'TRIGGER TYPE: ' + type_ + end
+    s += 'MIRA RESULTS' if lst == accs else 'BASLINE RESULTS'
+    s += end
+    s += 'Average val accuracy: ' + str(np.mean([t[0] for t in lst])) + end
+    s += 'Average test accuracy: ' + str(np.mean([t[1] for t in lst])) + end
+    for tup in lst:
+        s += '\t' + str(tup) + end
+    s += end
+    results.append(s)
+    print s
     results.append('------------------------------------------------')
-    return results
+    if get_res_str:
+        return results
+    else:
+        return ac, prediction_cv_list
+
+def results_by_type(ac, prediction_cv):
+    results_dict = {key:[] for key in ['do','be','to','modal','have','so']}
+
+    for index in range(len(prediction_cv)):
+        preds = prediction_cv[index]
+        type_dict = {key:[] for key in ['do','be','to','modal','have','so']}
+
+        for i,ant in enumerate(preds):
+            type_dict[ant.trigger.type].append(preds[i])
+
+        for type_ in type_dict:
+            results_dict[type_].append(1.0-ac.accuracy(type_dict[type_]))
+
+    for type_ in results_dict:
+        avg_f1 = np.mean(results_dict[type_])
+        print type_,'gets this antecedent identification accuracy:',avg_f1,'\n'
 
 def bos_compare():
     ac = init_classifier()
@@ -177,6 +216,28 @@ def bos_spen_split():
             ant.x = ant.x[range(404) + range(len(ant.x)-15, len(ant.x))]
         ac.initialize_weights(seed=seed)
 
+    if 'remove' in argv:
+        print 'Removing to-VPE...'
+        remove = [i for i in range(len(ac.train_triggers)) if ac.train_triggers[i].type=='to']
+        for idx in remove:
+            ac.train_triggers[idx] = None
+        ac.train_triggers = [t for t in ac.train_triggers if t is not None]
+
+        remove = [i for i in range(len(ac.val_triggers)) if ac.val_triggers[i].type=='to']
+        for idx in remove:
+            ac.val_triggers[idx] = None
+        ac.val_triggers = [t for t in ac.val_triggers if t is not None]       
+
+        remove = [i for i in range(len(ac.test_triggers)) if ac.test_triggers[i].type=='to']
+        for idx in remove:
+            ac.test_triggers[idx] = None
+        ac.test_triggers = [t for t in ac.test_triggers if t is not None]       
+
+    if 'end_to_end' in argv:
+        print 'Performing end-to-end evaluation...'
+        ac.use_auto_triggers = True
+        add_end_to_end(ac)
+
     ac.debug_ant_selection()
 
     val_acc, test_acc, val_preds, test_preds = ac.fit(epochs=EPOCHS, k=K, dropout=dropout)
@@ -244,8 +305,8 @@ def ablation_study(auto_parse=False, exclude=True):
         ac.initialize_weights(seed=seed)
 
         results = ['----\nFeature: %s\n' % feat_dict[tup]] + ['EXCLUDED' if exclude else 'INLCUDED', '\n'] \
-                  + cross_validate(auto_parse=auto_parse, classifier=ac)
-        log_results(results, fname='feature_ablation_ant_LIU_features_c%s_lr%s.txt'%(str(C), str(LR)))
+                  + cross_validate(auto_parse=auto_parse, classifier=ac, get_res_str=True)
+        log_results(results, fname='LAST_feature_ablation_ant_LIU_features_c%s_lr%s_LAST.txt'%(str(C), str(LR)))
 
 def log_results(results_lst, fname='ANT_CROSS_VALIDATION_RESULTS.txt'):
     with open(fname, 'a') as f:
@@ -322,15 +383,13 @@ if __name__ == '__main__':
         save_imported_data_for_antecedent(ac, fname=save_file)
 
     if 'types' in argv:
-        for type_ in [None,'do','be','to','modal','have','so']:
-            ac = None
+        ac = None
+        if mrg:
+            ac = load_imported_data_for_antecedent(fname=GOLD_PARSE_FULL_NPY_DATA)
 
-            if mrg:
-                ac = load_imported_data_for_antecedent(fname=GOLD_PARSE_FULL_NPY_DATA)
-
-            results_lst = cross_validate(type_=type_, auto_parse=not mrg, classifier=ac)
-
-            log_results(results_lst, fname=results_save)
+        ac, prediction_list = cross_validate(auto_parse=not mrg, classifier=ac, baseline='baseline' in argv)
+        results_by_type(ac, prediction_list)
+        # log_results(results_lst, fname=results_save)
 
     if 'ablate' in argv:
         ablation_study(auto_parse=not mrg, exclude=True)

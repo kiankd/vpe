@@ -885,6 +885,7 @@ class Auxiliary(object):
         self.is_trigger = False
         self.gold_ant = None
         self.possible_ants = []
+        self.was_automatically_detected = False
 
     def __repr__(self):
         if self.is_trigger:
@@ -932,6 +933,12 @@ class RawAuxiliary(object):
 
 """" ---- Antecedent classes. ---- """
 
+class EmptyAntecedent(object):
+    def __init__(self, trigger):
+        self.trigger = trigger
+
+    def get_words():
+        return ['']
 
 class Antecedent(object):
     def __init__(self, sentnum, trigger, sub_sentdict, start, end, section=-1):
