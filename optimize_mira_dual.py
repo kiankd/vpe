@@ -21,7 +21,7 @@ def norm(x):
 def slow_multiply(a, constants):
     """Multiplies a variable times each constant and returns the sum."""
     c = []
-    for i in range(len(constants)):
+    for i in xrange(len(constants)):
         c.append(a * constants[i])
     return quicksum(c)
 
@@ -43,14 +43,14 @@ def update_weights(old, best, gold, L, C=1.0):
     # print 'best[0].x',best[0].x
     # print 'gold.x',gold.x
 
-    diffs = [(gold.x - best[k].x) for k in range(primal_constraints)]
+    diffs = [(gold.x - best[k].x) for k in xrange(primal_constraints)]
 
     s = []
-    for k in range(primal_constraints):
+    for k in xrange(primal_constraints):
         s.append(slow_multiply(alpha[k], diffs[k]))
 
-    obj = -0.5 * norm(s) + quicksum(alpha[k] * L(gold, best[k]) for k in range(primal_constraints))\
-                         - quicksum(alpha[k] * np.dot(diffs[k], old) for k in range(primal_constraints))
+    obj = -0.5 * norm(s) + quicksum(alpha[k] * L(gold, best[k]) for k in xrange(primal_constraints))\
+                         - quicksum(alpha[k] * np.dot(diffs[k], old) for k in xrange(primal_constraints))
 
     m.setObjective(obj, GRB.MAXIMIZE)
     m.addConstr(quicksum(alpha) <= C, "c1") # Very simple constraint based on learning rate.
@@ -59,7 +59,7 @@ def update_weights(old, best, gold, L, C=1.0):
     m.optimize()    
 
     # Weight update step:
-    return old + np.sum(alpha[k].x * diffs[k] for k in range(primal_constraints))
+    return old + np.sum(alpha[k].x * diffs[k] for k in xrange(primal_constraints))
 
 if __name__ == '__main__':
     old = np.array([1.0, 1.0])

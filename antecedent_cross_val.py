@@ -10,10 +10,12 @@ from random import shuffle
 from load_data import find_section
 from sklearn.linear_model import LogisticRegressionCV
 
+print argv
+
 AUTO_PARSE_NPY_DATA      = 'antecedent_auto_parse_data_FULL_DATASET.npy'
 GOLD_PARSE_FULL_NPY_DATA = 'antecedent_GOLD_parse_data_FULL_DATASET.npy'
 AUTO_PARSE_ALL_ANTS_NPY  = 'antecedent_auto_parse_ALL_ANTS_with_liu.npy'
-END_TO_END = 'END_TO_END_PREDICTIONS.npy'
+END_TO_END = 'END_TO_END_PREDICTIONS_FINAL_ABSOLUTE.npy'
 
 if platform == 'linux2':
     AUTO_PARSE_NPY_DATA      = '../npy_data/' + AUTO_PARSE_NPY_DATA
@@ -22,11 +24,14 @@ if platform == 'linux2':
 
 # antecedent classifier hyper parameters
 K = 5
-C = 5.0
-LR = 0.01
+C = 2.65
+LR = 0.0075
 dropout = 0.0
-EPOCHS = 5
-seed = 347890
+EPOCHS = 2
+seed = 1611944
+
+print 'We used parameters:'
+print 'k=%d, c=%0.2f, epochs=%d, lr=%0.07f, seed=%d' % (K, C, EPOCHS, LR, seed)
 
 for arg in argv:
     if arg.startswith('seed='):
@@ -49,11 +54,22 @@ def init_classifier(auto_parse=True):
     return ac
 
 def add_end_to_end(classifier):
-    predictions_on_gold = np.load(END_TO_END)[0]
-    assert len(classifier.test_triggers) == len(predictions_on_gold)
-    for i,val in enumerate(predictions_on_gold):
-        if val == 1:
-            classifier.test_triggers[i].was_automatically_detected = True
+    print 'Adding end to end results...'
+    gold_and_predicted = np.load(END_TO_END)[0]
+    false_positives = 0
+    i = 0
+    for gold,predicted in gold_and_predicted:
+        if gold == 1:
+            if predicted == 1:
+                classifier.test_triggers[i].was_automatically_detected = True
+            else:
+                classifier.test_triggers[i].was_automatically_detected = False
+            i += 1
+        elif gold==0 and predicted==1:
+            false_positives += 1
+    classifier.false_positives = false_positives
+    print '%d false positives. %0.2f percent of the data are FPs.'\
+          %(classifier.false_positives, false_positives/(float(false_positives + i)))
 
 def cross_validate(k_fold=5, type_=None, auto_parse=False, classifier=None, baseline=False, get_res_str=False):
     prediction_cv_list = []
@@ -134,7 +150,7 @@ def cross_validate(k_fold=5, type_=None, auto_parse=False, classifier=None, base
 def results_by_type(ac, prediction_cv):
     results_dict = {key:[] for key in ['do','be','to','modal','have','so']}
 
-    for index in range(len(prediction_cv)):
+    for index in xrange(len(prediction_cv)):
         preds = prediction_cv[index]
         type_dict = {key:[] for key in ['do','be','to','modal','have','so']}
 
@@ -164,7 +180,7 @@ def bos_compare():
         if trig.type == 'do':
             section = None
 
-            for sec in range(0, 25):
+            for sec in xrange(0, 25):
                 if trig.sentnum < section_ends[sec]:
                     section = sec
                     break
@@ -241,7 +257,7 @@ def bos_spen_split():
     ac.debug_ant_selection()
 
     val_acc, test_acc, val_preds, test_preds = ac.fit(epochs=EPOCHS, k=K, dropout=dropout)
-    bval_acc, btest_acc = ac.baseline_prediction()
+    bval_acc, btest_acc = None,None #ac.baseline_prediction()
 
     print 'MIRA RESULTS:'
     print val_acc, test_acc
@@ -249,6 +265,23 @@ def bos_spen_split():
     print bval_acc, btest_acc
 
     prediction_results(test_preds, [trig.gold_ant for trig in ac.test_triggers])
+
+    # results with end to end
+    if 'end_to_end' in argv:
+        print 'RESULTS WITH END TO END:'
+        precision_results_by_trig = [0.]*ac.false_positives # add 0 for each false positives
+        recall_results_by_trig = []
+        for i,trig in enumerate(ac.test_triggers):
+            if not trig.was_automatically_detected:
+                recall_results_by_trig.append(0.)
+            else:
+                tp_score = 1.0-ac.loss_function(trig.gold_ant, test_preds[i])
+                precision_results_by_trig.append(tp_score)
+                recall_results_by_trig.append(tp_score)
+
+        precision, recall = np.mean(precision_results_by_trig), np.mean(recall_results_by_trig)
+        f1 = (2*precision*recall)/(precision+recall)
+        print 'Precision: %0.4f, Recall: %0.4f, F1: %0.4f'%(precision,recall,f1)
 
     return
 
@@ -264,7 +297,7 @@ def prediction_results(proposed, actual):
         else:
             fp += 1
 
-    print '\nLiu precision', float(tp)/(tp+fp)
+    print '\nLiu head resolution', float(tp)/(tp+fp)
 
 def ablation_study(auto_parse=False, exclude=True):
     # This is the division of features by their class:
@@ -368,16 +401,17 @@ if __name__ == '__main__':
         results_save = results_save[:-4]+'_antgen2.txt'
 
     if 'build' in argv:
-        # ac = AntecedentClassifier(0,14,15,19,20,24)
-        # ac.import_data(get_mrg=mrg)
+        ac = AntecedentClassifier(0,14,15,19,20,24)
+        ac.import_data(get_mrg=mrg)
         # save_imported_data_for_antecedent(ac, fname=save_file)
         # exit(0)
 
         ac = load_imported_data_for_antecedent(fname=save_file)
-        # ac.generate_possible_ants(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb], filter=True)
-        # ac.debug_ant_selection()
+        ac.generate_possible_ants(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb], filter=True)
+        ac.debug_ant_selection()
         # save_imported_data_for_antecedent(ac, fname=save_file)
         # exit(0)
+
         ac.build_feature_vectors()
         ac.normalize()
         save_imported_data_for_antecedent(ac, fname=save_file)
@@ -407,4 +441,6 @@ if __name__ == '__main__':
         ac.test_triggers = ac.test_triggers[0:2]
         ac.generate_possible_ants(['VP', wc.is_predicative, wc.is_adjective, wc.is_verb])
         ac.build_feature_vectors(debug=True)
+
+
 

@@ -484,9 +484,8 @@ def save_end_to_end(gold, predicted):
     assert len(gold) == len(predicted)
     predictions_on_gold = []
     for i,gold_val in enumerate(gold):
-        if gold_val == 1:
-            predictions_on_gold.append(predicted[i])
-    np.save('END_TO_END_PREDICTIONS.npy', np.array([predictions_on_gold]))
+        predictions_on_gold.append([gold[i], predicted[i]])
+    np.save('END_TO_END_PREDICTIONS_FINAL_ABSOLUTE.npy', np.array([predictions_on_gold]))
 
 def find_section(sentnum, section_dict):
     for sec in sorted(section_dict.iterkeys()):
@@ -536,3 +535,4 @@ if __name__ == '__main__':
 
     if 'bos_spen' in argv:
         bos_train_test_split()
+    bos_train_test_split()

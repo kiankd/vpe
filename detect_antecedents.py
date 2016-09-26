@@ -11,7 +11,7 @@ import time
 import sys
 from heapq import nlargest, nsmallest
 from os import listdir
-from pyprind import ProgBar
+# from pyprind import ProgBar
 from random import randrange,sample,random
 from matplotlib import pyplot as plt
 from alignment import alignment_matrix
@@ -27,6 +27,9 @@ def shuffle(list_):
     np.random.shuffle(list_)
     return list_
 
+class ProgBar(object):
+    def __init__(self, n): self.n = n
+    def update(self): pass
 
 class AntecedentClassifier(object):
     SCHEDULE_FREQUENCY = 10
@@ -58,6 +61,7 @@ class AntecedentClassifier(object):
 
         self.missed_vpe = 0
         self.num_features = 0
+        self.false_positives = 0
 
         self.norms = []
         self.feature_vals = []
@@ -69,7 +73,7 @@ class AntecedentClassifier(object):
         self.train_results, self.val_results, self.test_results = [], [], []
         self.diffs = []
 
-        self.section_ends = {x:None for x in range(0, 25)}
+        self.section_ends = {x:None for x in xrange(0, 25)}
         self.sentence_words = []
         self.use_auto_triggers = False
 
@@ -318,7 +322,7 @@ class AntecedentClassifier(object):
 
     def bestk_ants(self, trigger, w, k=5):
         """Return the best k antecedents given the weight vector w with respect to the score attained."""
-        for a in range(len(trigger.possible_ants)):
+        for a in xrange(len(trigger.possible_ants)):
             trigger.possible_ants[a].set_score(w)
 
         return nlargest(k, trigger.possible_ants, key=vpe.Antecedent.get_score)
@@ -520,14 +524,14 @@ class AntecedentClassifier(object):
         best_err = 100.0
         best_weights = []
         i=0
-        for n in range(epochs):
+        for n in xrange(epochs):
             for trigger in shuffle(self.train_triggers):
                 pre_drop_bestk = self.bestk_ants(trigger, self.W_old, k=k)
 
                 if dropout > 0:
                     bestk = deepcopy(pre_drop_bestk)
                     for ant in bestk:
-                        for i in range(len(ant.x)):
+                        for i in xrange(len(ant.x)):
                             if random() <= dropout:
                                 ant.x[i] = 0.0
                 else:
@@ -594,7 +598,7 @@ class AntecedentClassifier(object):
         self.W_avg = best_weight_vector
 
         val_preds = self.predict(self.val_triggers)
-        test_preds = self.predict(self.test_triggers)
+        test_preds = self.predict(self.test_triggers, test=True)
 
         print 'Validation em/hm/ho using best weight vector:',self.criteria_based_results(val_preds)
         print 'Test em/hm/ho using best weight vector:',self.criteria_based_results(test_preds)
@@ -609,9 +613,9 @@ class AntecedentClassifier(object):
     def predict(self, trigger_list, test=False):
         predictions = []
         for trigger in trigger_list:
-            if test and self.use_auto_triggers and not trigger.was_automatically_detected:
-                predictions.append(vpe.EmptyAntecedent(trigger))
-            else:
+            # if test and self.use_auto_triggers and not trigger.was_automatically_detected:
+            #     predictions.append(vpe.EmptyAntecedent(trigger))
+            # else:
                 predictions.append(self.bestk_ants(trigger, self.W_avg, k=1)[0])
         return predictions
 
@@ -692,15 +696,15 @@ class AntecedentClassifier(object):
         self.norms.append(np.linalg.norm(w))
 
         if not self.feature_vals:
-            self.feature_vals = [[] for _ in range(num_features)]
+            self.feature_vals = [[] for _ in xrange(num_features)]
             self.feature_names = ['Bias weight']
-            for i in range(num_features - 2):
+            for i in xrange(num_features - 2):
                 self.random_features.append(randrange(1, len(w)))
                 self.feature_names.append('Rand_feature %d' % self.random_features[i])
             self.feature_names.append('NP dot product/norm')
 
         self.feature_vals[0].append(w[0])
-        for i in range(num_features - 2):
+        for i in xrange(num_features - 2):
             self.feature_vals[i + 1].append(w[self.random_features[i]])
         self.feature_vals[-1].append(w[-1])
 
@@ -710,7 +714,7 @@ class AntecedentClassifier(object):
 
         plt.figure(1)
         plt.title('Running Average Weight Vector 2-Norm over time')
-        plt.plot(range(len(self.norms)), self.norms, 'b-')
+        plt.plot(xrange(len(self.norms)), self.norms, 'b-')
         plt.savefig(params + 'norm_change1.png', bbox_inches='tight')
         plt.clf()
 
@@ -1010,7 +1014,6 @@ if __name__ == '__main__':
     # name = 'RANDOMNESS_results_by_trig_c%s_lr%s_k%s_randrange%s_'%(str(a.C),str(lr),str(K),str(rand_range))
     name = 'ALL_ULTIMATE_RESULTS_c%s_lr%s_k%s'%(str(a.C),str(lr),str(K))
 
-
     a.fit(epochs=2, k=K, verbose=True)
     # a.make_graphs(name)
     # a.log_results(name)
@@ -1018,77 +1021,3 @@ if __name__ == '__main__':
     print '\nLEARN RATE, C, K, seed:', lr, a.C, K, seed
 
     print 'Time taken: %0.2f'%(time.clock() - start_time)
-
-
-"""
-
--------------
-best results:
-c = 5.0, k = 5, lr = 0.01 - regular loss function, over 'do', seed=347890 ==> 71 hm val, 73 hm test
-c = 5.0, k = 5, lr = 0.01 - regular loss function, over 'do', seed=124312421 ==> 44 hm val, 53 hm test
-c = 5.0, k = 5, lr = 0.01 - regular loss function, over 'do', seed=9000 ==> 46 hm val, 58 hm test
-
-c = 5.0, k = 5, lr = 0.01 - regular loss function, over 'do', weights 1 ==> 52 hm val, 64 hm test
-c = 5.0, k = 5, lr = 0.01 - regular loss function, over 'do', seed=7777455577 ==> 58 hm val, 76 hm test
-
-c = 5.0, k = 10, lr = 0.01 - regular loss function, over 'do', seed=347890 ==> 63 hm val, 60 hm test
-c = 5.0, k = 15, lr = 0.1 - regular loss function, over 'do', seed=347890 ==> 62 hm val, 67 hm test
-c = 5.0, k = 20, lr = 0.1 - regular loss function, over 'do', seed=347890 ==> 62 hm val, 67 hm test
-c = 5.0, k = 5, lr = 0.001 - regular loss function, over 'do', seed=347890 ==> 67 hm val, 69 hm test
-c = 5.0, k = 5, lr = 0.05 - regular loss function, over 'do', seed=347890 ==> 60 hm val, 73 hm test
-c = 5.0, k = 5, lr = 0.1 - regular loss function, over 'do', seed=347890 ==> 58 hm val, 73 hm test
-c = 5.0, k = 5, lr = 0.5 - regular loss function, over 'do', seed=347890 ==> 58 hm val, 69 hm test
--------------
-
-1) Delete potential antecedents that contain the trigger in them  - DONE
-    --> Figure out why there seems to be low recall in getting gold ants for extraction - DONE AND FIXED
-    --> Rewrite potential antecedent extraction - DONE
-
-2) Check alignments between gold alignment vs bad antecedent alignment.
-    --> Need to make it so that chunks DONT overlap! No word repeats! - DONE no more overlapping
-    --> Figure out why there are so many repeated alignment vectors!
-        --> look at and compare ones with same vectors
-        --> try to abolish arbitrary featurism
-    --> Fix the context extraction so that we don't get super big contexts!
-
-3) Think about adding semantic info to the features - word2vec.
-    --> Measure to compare the difference between the word content!
-    --> Need to differentiate between different clauses of same syntactic structure
-    --> *** Add nice word2vec features:
-            Take average word2vec angle between all mappings
-            Make new features for:
-                if nsub/dobj etc. are mapped, make these 4 different features comparing word2vec sim btwn chunks.
-
-
-ACL DEADLINE = MARCH 18TH
-
-WHAT IS TO BE DONE:
-0) fix the graphs so that we know exactly what features we are looking at - there was no error DONE
-1) Baseline results (essentially just graph the most recent VP behind the trigger)
-2) Implement HEAD MATCH/exact/overlap to add to the results analysis to have a better way to compare - DONE
-3) look at the Hardt paper and see what he does.
-4) why is our system working well? See how performance changes w.r.t. with/without word2vec features, alignment features etc.
-5) run vpe detection with normalized features and an SVM
-
-
-0) Analyze results with respect to the type of trigger that we are considering. i.e. DO and not DO SO
-
-BASELINE!!!!!!!!!!!!!!!
-
-# Add Hardt features!
-# Test changing Loss function to say 0percent if there is NO head in the proposed ant (hard constraint)
-# also can think about how we can weight diff words in loss function.
-# Make MIRA vizualization and check obj. function scoring of diff things
-
-
-- try training it on FULL dataset for testing on just do -*
-- have a correctness measure of looking at the top K antecedents and if the exact one
-is in this list of K then we can say that, well when we miss we are pretty close
-- look at some examples and see what the margin of score between the best and second best
-- MOAR FEATURESSSSZZ
-"""
-
-
-
-# We were getting good with c=0.1 and lr = 0.0001, k=5!!!
-

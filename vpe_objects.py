@@ -936,9 +936,14 @@ class RawAuxiliary(object):
 class EmptyAntecedent(object):
     def __init__(self, trigger):
         self.trigger = trigger
+        self.sentnum = trigger.gold_ant.sentnum
+        self.sub_sentdict = SubSentDict([''], [''], [''])
 
-    def get_words():
+    def get_words(self):
         return ['']
+
+    def get_head(self):
+        return ''
 
 class Antecedent(object):
     def __init__(self, sentnum, trigger, sub_sentdict, start, end, section=-1):
